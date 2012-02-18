@@ -1,0 +1,24 @@
+xterm-color.el is an ANSI escape sequence to text-properties translator
+
+* Features
+  - Regular ANSI color support
+  - XTERM 256 color support
+  - Bonus: Faster than ansi-color.el
+
+* Usage 
+
+  (progn (setq comint-preoutput-filter-functions '(xterm-color-filter))
+         (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
+        (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
+ 
+  (progn (setq comint-preoutput-filter-functions nil)
+         (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
+        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
+
+
+* License
+The code comes with a BSD-style license so you can basically do with it
+whatever you want.
+
+* Author
+xristos (AT) sdf (DOT) lonestar (DOT) org
