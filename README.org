@@ -6,15 +6,18 @@ xterm-color.el is an ANSI escape sequence to text-properties translator
   - Bonus: Faster than ansi-color.el
 
 * Usage 
-
+#+BEGIN_SRC emacs-lisp
+  ;; Install
   (progn (setq comint-preoutput-filter-functions '(xterm-color-filter))
          (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
-        (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
- 
+         (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
+  
+  ;; Uninstall
   (progn (setq comint-preoutput-filter-functions nil)
          (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
-        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
-
+         (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
+  
+#+END_SRC
 
 * License
 The code comes with a BSD-style license so you can basically do with it
