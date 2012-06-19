@@ -60,8 +60,10 @@
 ;;
 ;;; Code:
 
-(defvar xterm-color-current (make-hash-table)
+(defvar xterm-color-current nil
   "Current ANSI color.")
+
+(make-variable-buffer-local 'xterm-color-current)
 
 (defvar xterm-color-ring ""
   "Ring buffer with characters that the current ANSI color applies to.
@@ -69,11 +71,17 @@ In order to avoid having per-character text properties, we grow this
 buffer dynamically until we encounter an ANSI reset sequence.
 Once that happens, we generate a single text property for the entire string.")
 
+(make-variable-buffer-local 'xterm-color-ring)
+
 (defvar xterm-color-var ""
   "Temporary string that holds ANSI sequence variables (integers).")
 
+(make-variable-buffer-local 'xterm-color-var)
+
 (defvar xterm-color-state :char
   "The current state of the ANSI sequence state machine.")
+
+(make-variable-buffer-local 'xterm-color-state)
 
 (defcustom xterm-color-names
   ["black" "red" "green" "yellow" "blue" "magenta" "cyan" "white"]
@@ -87,11 +95,6 @@ Once that happens, we generate a single text property for the entire string.")
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
-(mapc 'make-variable-buffer-local
-      '(xterm-color-current
-        xterm-color-ring
-        xterm-color-var
-        xterm-color-state))
 
 (defun xterm-color-unfontify-region (beg end)
   "Replacement function for `font-lock-default-unfontify-region'.
@@ -183,6 +186,8 @@ if the property `xterm-color' is set. A possible way to install this would be:
 Returns new region.
 This can be inserted into `comint-preoutput-filter-functions'.
 Also see `xterm-color-unfontify-region'."
+  (when (null xterm-color-current)
+    (setq xterm-color-current (make-hash-table)))
   (let ((result nil))
     (macrolet ((insert (x) `(push ,x result))
                (maybe-fontify
