@@ -3,7 +3,7 @@
 ;; Copyright (C) 2010 xristos@sdf.lonestar.org
 ;; All rights reserved
 
-;; Version: 0.5 - 2010-05-27
+;; Version: 1.0 - 2012-07-07
 ;; Author: xristos@sdf.lonestar.org
 ;;
 ;; Redistribution and use in source and binary forms, with or without
