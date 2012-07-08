@@ -42,11 +42,11 @@
 ;;; Install/Uninstall (comint):
 ;;
 ;; 
-;; (progn (setq comint-preoutput-filter-functions '(xterm-color-filter))
+;; (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
 ;;        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
 ;;        (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
 ;; 
-;; (progn (setq comint-preoutput-filter-functions nil)
+;; (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
 ;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
 ;;        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
 ;;
@@ -69,6 +69,7 @@
   "Ring buffer with characters that the current ANSI color applies to.
 In order to avoid having per-character text properties, we grow this
 buffer dynamically until we encounter an ANSI reset sequence.
+
 Once that happens, we generate a single text property for the entire string.")
 
 (make-variable-buffer-local 'xterm-color-ring)
@@ -85,13 +86,13 @@ Once that happens, we generate a single text property for the entire string.")
 
 (defcustom xterm-color-names
   ["black" "red" "green" "yellow" "blue" "magenta" "cyan" "white"]
-  "The default colors to use for regular ANSI colors (both fg and bg)."
+  "The default colors to use for regular ANSI colors."
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
 (defcustom xterm-color-names-bright
   ["black" "red" "green" "yellow" "blue" "magenta" "cyan" "white"]
-  "The default colors to use for bright ANSI colors (both fg and bg)."
+  "The default colors to use for bright ANSI colors."
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
@@ -177,13 +178,13 @@ if the property `xterm-color' is set. A possible way to install this would be:
     ret))
 
 (defun xterm-color-new-state (state)
-  ;(message "xterm-color: %s -> %s" xterm-color-state state)
   (setq xterm-color-state state))
 
 
 (defun xterm-color-filter (string)
   "Translate ANSI color sequences in STRING into text properties.
-Returns new region.
+Returns new STRING with text properties applied.
+
 This can be inserted into `comint-preoutput-filter-functions'.
 Also see `xterm-color-unfontify-region'."
   (when (null xterm-color-current)
