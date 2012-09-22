@@ -252,7 +252,7 @@ Also see `xterm-color-unfontify-region'."
                (cond ((= char ?c)       ; ESC[0c query terminal, ignore
                       (setq xterm-color-var "")
                       (xterm-color-new-state :char))
-                     ((= char ?m)
+                     ((= char ?m)       ; XXX: bug here ;40m is not right
                       (clrhash xterm-color-current)
                       (setq xterm-color-var "")
                       (xterm-color-new-state :char))
