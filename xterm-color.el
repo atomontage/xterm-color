@@ -77,8 +77,6 @@
   :type 'boolean
   :group 'xterm-color)
 
-(make-variable-buffer-local 'xterm-color-debug)
-
 (defcustom xterm-color-names
   ;; black     red       green    yellow    blue      magenta    cyan     gray
   ["#000000" "#c23621" "#25bc24" "#adad27" "#492ee1" "#d338d3" "#33bbc8" "#cbcccd"]
