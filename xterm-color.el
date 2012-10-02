@@ -39,19 +39,41 @@
 ;;
 ;; xterm-color.el should perform much better than ansi-color.el
 ;;
-;;; Install/Uninstall (comint):
+;;; Usage:
 ;;
-;; 
+;; Call xterm-color-filter to propertize strings that you can then insert into
+;; a buffer. All state is kept in buffer-local variables which means that
+;; control sequences can span xterm-color-filter call boundaries.
+;;
+;; Example:
+;;
+;; (xterm-color-filter "[0;1;3;4")
+;; (xterm-color-filter ";35")
+;; (xterm-color-filter ";mThis is only a test")
+;; (xterm-color-filter "[0m")
+;;
+;; If you are inserting into a buffer that has activated font locking, you need
+;; to set font-lock-unfontify-region-function to xterm-color-unfontify-region
+;;
+;;
+;; You can replace ansi-color.el with xterm-color for all comint buffers:
+;;
+;; comint install:
+;;
 ;; (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
 ;;        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
 ;;        (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
-;; 
+;;
+;; comint uninstall:
+;;
 ;; (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
 ;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
 ;;        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
 ;;
 ;; 
 ;;; Test:
+;;
+;; For comint:
 ;;
 ;; M-x shell
 ;; wget http://www.frexx.de/xterm-256-notes/data/256colors2.pl
@@ -211,7 +233,6 @@ if the property `xterm-color' is set. A possible way to install this would be:
                       ;; Bright color
                       (setq xterm-color-attributes (logior xterm-color-attributes
                                                            +xterm-color-bright+))
-                      (xterm-color-message "BRIGHT!")
                       (cdr elems))
                      ((= 2 init)
                       ;; Faint color, emulated as normal intensity
@@ -322,13 +343,7 @@ if the property `xterm-color' is set. A possible way to install this would be:
   (let ((ret nil)
         (fg (gethash 'foreground-color xterm-color-current))
         (bg (gethash 'background-color xterm-color-current)))
-    (macrolet ((is-set? (attrib) `(> (logand ,attrib xterm-color-attributes) 0))
-               (get-color (color)
-                `(if (stringp ,color)
-                     ,color
-                   (if (is-set? +xterm-color-bright+)
-                       (aref xterm-color-names-bright ,color)
-                   (aref xterm-color-names ,color)))))
+    (macrolet ((is-set? (attrib) `(> (logand ,attrib xterm-color-attributes) 0)))
       (when (is-set? +xterm-color-italic+)
         (push `(:slant italic) ret))
       (when (is-set? +xterm-color-underline+)
@@ -338,9 +353,15 @@ if the property `xterm-color' is set. A possible way to install this would be:
       (when (is-set? +xterm-color-negative+)
         (push `(:inverse-video t) ret))
       (when fg
-        (push `(:foreground ,(get-color fg)) ret))
+        (push `(:foreground ,(if (stringp fg)
+                                 fg
+                               (if (is-set? +xterm-color-bright+)
+                                   (aref xterm-color-names-bright fg)
+                                 (aref xterm-color-names fg))))
+              ret))
       (when bg
-        (push `(:background ,(get-color bg)) ret)))
+        (push `(:background ,(if (stringp bg) bg (aref xterm-color-names bg)))
+              ret)))
     ret))
 
 (defun xterm-color-filter (string)
@@ -412,5 +433,6 @@ Also see `xterm-color-unfontify-region'."
       (when (eq xterm-color-state :char) (maybe-fontify)))
     (mapconcat 'identity (nreverse result) "")))
 
+   
 (provide 'xterm-color)
 ;;; xterm-color.el ends here
