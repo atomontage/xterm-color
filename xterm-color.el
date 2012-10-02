@@ -60,42 +60,94 @@
 ;;
 ;;; Code:
 
+(require 'cl)
+
+(defgroup xterm-color nil
+  "Translates ANSI control sequences to text properties."
+  :prefix "xterm-color-"
+  :group 'processes)
+
+;;
+;; CUSTOM
+;;
+
+(defcustom xterm-color-debug t
+  "Print ANSI state machine debug information in *Messages* if T.
+  This becomes buffer-local whenever it is set."
+  :type 'boolean
+  :group 'xterm-color)
+
+(make-variable-buffer-local 'xterm-color-debug)
+
+(defcustom xterm-color-names
+  ;; black     red       green    yellow    blue      magenta    cyan     gray
+  ["#000000" "#c23621" "#25bc24" "#adad27" "#492ee1" "#d338d3" "#33bbc8" "#cbcccd"]
+  "The default colors to use for regular ANSI colors."
+  :type '(vector string string string string string string string string)
+  :group 'xterm-color)
+
+(defcustom xterm-color-names-bright
+  ;; dark gray  red     green     yellow    blue      magenta   cyan      white
+  ["#818383" "#fc391f" "#31e722" "#eaec23" "#5833ff" "#f935f8" "#14f0f0" "#e9ebeb"]
+  "The default colors to use for bright ANSI colors."
+  :type '(vector string string string string string string string string)
+  :group 'xterm-color)
+
+;;
+;; Buffer locals, used by state machine
+;; 
+
 (defvar xterm-color-current nil
-  "Current ANSI color.")
+  "Hash table with current ANSI color (fg, bg).")
 
 (make-variable-buffer-local 'xterm-color-current)
 
-(defvar xterm-color-ring ""
-  "Ring buffer with characters that the current ANSI color applies to.
+(defvar xterm-color-char-buffer ""
+  "Buffer with characters that the current ANSI color applies to.
 In order to avoid having per-character text properties, we grow this
 buffer dynamically until we encounter an ANSI reset sequence.
 
 Once that happens, we generate a single text property for the entire string.")
 
-(make-variable-buffer-local 'xterm-color-ring)
+(make-variable-buffer-local 'xterm-color-char-buffer)
 
-(defvar xterm-color-var ""
-  "Temporary string that holds ANSI sequence variables (integers).")
+(defvar xterm-color-csi-buffer ""
+  "Buffer with current ANSI CSI sequence bytes.")
 
-(make-variable-buffer-local 'xterm-color-var)
+(make-variable-buffer-local 'xterm-color-csi-buffer)
+
+(defvar xterm-color-osc-buffer ""
+  "Buffer with current ANSI OSC sequence bytes.")
+
+(make-variable-buffer-local 'xterm-color-osc-buffer)
 
 (defvar xterm-color-state :char
   "The current state of the ANSI sequence state machine.")
 
 (make-variable-buffer-local 'xterm-color-state)
 
-(defcustom xterm-color-names
-  ["black" "red" "green" "yellow" "blue" "magenta" "cyan" "white"]
-  "The default colors to use for regular ANSI colors."
-  :type '(vector string string string string string string string string)
-  :group 'xterm-color)
+(defvar xterm-color-attributes 0)
 
-(defcustom xterm-color-names-bright
-  ["black" "red" "green" "yellow" "blue" "magenta" "cyan" "white"]
-  "The default colors to use for bright ANSI colors."
-  :type '(vector string string string string string string string string)
-  :group 'xterm-color)
+(make-variable-buffer-local 'xterm-color-attributes)
 
+(defconst +xterm-color-bright+    1)
+(defconst +xterm-color-italic+    2)
+(defconst +xterm-color-underline+ 4)
+(defconst +xterm-color-strike+    8)
+(defconst +xterm-color-negative+  16)
+
+
+;;
+;; Functions
+;; 
+
+
+(defun xterm-color-message (format-string &rest args)
+  "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is T."
+  (when xterm-color-debug
+    (let ((message-truncate-lines t))
+      (apply 'message format-string args)
+      (message nil))))
 
 (defun xterm-color-unfontify-region (beg end)
   "Replacement function for `font-lock-default-unfontify-region'.
@@ -122,32 +174,128 @@ if the property `xterm-color' is set. A possible way to install this would be:
 	(remove-text-properties beg end-face '(face nil))
 	(setq beg end-face)))))
 
-(defun xterm-color-dispatch-ansi-var (var)
-  (cond ((= var 38)
-         (xterm-color-new-state :xterm-fg))
-        ((= var 0)
-         (clrhash xterm-color-current))
-        ((= var 48)
-         (xterm-color-new-state :xterm-bg))
-        ((= var 30)
-         (remhash 'foreground-color
-                  xterm-color-current))
-        ((and (>= var 31)
-              (<= var 37))
-         (puthash 'foreground-color
-                  (aref xterm-color-names (- var 30))
-                  xterm-color-current))
-        ((and (>= var 40)
-              (<= var 47))
-         (puthash 'background-color
-                  (aref xterm-color-names (- var 40))
-                  xterm-color-current))))
+
+(defun xterm-color-dispatch-csi (csi)
+  (labels ((is-set? (attrib)
+              (> (logior attrib xterm-color-attributes) 0))
+            (dispatch-SGR (elems)
+              (let ((init (first elems)))
+                (cond ((= 0 init)
+                       ;; Reset
+                       (clrhash xterm-color-current)
+                       (setq xterm-color-attributes 0)
+                       (rest elems))
+                      ((= 38 init)
+                       ;; XTERM 256 FG color
+                       (setf (gethash 'foreground-color xterm-color-current) (xterm-color-256 (third elems)))
+                       (cdddr elems))
+                      ((= 48 init)
+                       ;; XTERM 256 BG color
+                       (setf (gethash 'background-color xterm-color-current) (xterm-color-256 (third elems)))
+                       (cdddr elems))
+                      ((= 39 init)
+                       ;; Reset to default FG color
+                       (remhash 'foreground-color xterm-color-current)
+                       (cdr elems))
+                      ((= 49 init)
+                       ;; Reset to default BG color
+                       (remhash 'background-color xterm-color-current)
+                       (cdr elems))
+                      ((and (>= init 30)
+                            (<= init 37))
+                       ;; ANSI FG color
+                       (setf (gethash 'foreground-color xterm-color-current) (- init 30))
+                       (cdr elems))
+                      ((and (>= init 40)
+                            (<= init 47))
+                       ;; ANSI BG color
+                       (setf (gethash 'background-color xterm-color-current) (- init 40))
+                       (cdr elems))
+                      ((= 1 init)
+                       ;; Bright color
+                       (setq xterm-color-attributes (logior xterm-color-attributes
+                                                            +xterm-color-bright+))
+                       (cdr elems))
+                      ((= 2 init)
+                       ;; Faint color, emulated as normal intensity
+                       (setq xterm-color-attributes (logand xterm-color-attributes
+                                                            (lognot +xterm-color-bright+)))
+                       (cdr elems))
+                      ((= 3 init)
+                       ;; Italic
+                       (setq xterm-color-attributes (logior xterm-color-attributes
+                                                            +xterm-color-italic+))
+                       (cdr elems))
+                      ((= 4 init)
+                       ;; Underline
+                       (setq xterm-color-attributes (logior xterm-color-attributes
+                                                            +xterm-color-underline+))
+                       (cdr elems))
+                      ((= 7 init)
+                       ;; Negative
+                       (setq xterm-color-attributes (logior xterm-color-attributes
+                                                            +xterm-color-negative+))
+                       (cdr elems))
+                      ((= 9 init)
+                       ;; Strike
+                       (setq xterm-color-attributes (logior xterm-color-attributes
+                                                            +xterm-color-strike+))
+                       (cdr elems))
+                      ((= 22 init)
+                       ;; Normal intensity
+                       (setq xterm-color-attributes (logand xterm-color-attributes
+                                                            (lognot +xterm-color-bright+)))
+                       (cdr elems))
+                      ((= 23 init)
+                       ;; No italic
+                       (setq xterm-color-attributes (logand xterm-color-attributes
+                                                            (lognot +xterm-color-italic+)))
+                       (cdr elems))
+                      ((= 24 init)
+                       (setq xterm-color-attributes (logand xterm-color-attributes
+                                                            (lognot +xterm-color-underline+)))
+                       (cdr elems))
+                      ((= 27 init)
+                       (setq xterm-color-attributes (logand xterm-color-attributes
+                                                            (lognot +xterm-color-negative+)))
+                       (cdr elems))
+                      ((= 29 init)
+                       (setq xterm-color-attributes (logand xterm-color-attributes
+                                                            (lognot +xterm-color-strike+)))
+                       (cdr elems))
+                      (t (xterm-color-message "xterm-color: not implemented SGR attribute %s" init)
+                         (cdr elems))))))
+    (let* ((len (length csi))
+           (term (aref csi (1- len))))
+      (cond ((= ?m term)
+             ;; SGR
+             (if (= len 1)
+                 (setq csi "0")
+               (setq csi (substring csi 0 (1- len))))
+             (let ((elems (mapcar 'string-to-number (split-string csi ";"))))
+               (while elems
+                 (setq elems (dispatch-SGR elems)))))
+            ((= ?J term)
+             ;; Clear screen
+             (xterm-color-message "xterm-color: %s CSI not implemented (clear screen)" csi))
+            ((= ?C term)
+             (let ((num (string-to-number (substring csi 0 (1- len)))))
+               (setq xterm-color-char-buffer
+                     (concat xterm-color-char-buffer
+                             (make-string num 32)))))
+            (t
+             (xterm-color-message "xterm-color: %s CSI not implemented" csi))))))
+
+
+(defun xterm-color-dispatch-osc (osc)
+  ;; Do nothing, for now
+  )
 
 (defun xterm-color-256 (color)
   (cond ((and (>= color 232)
               (<= color 255))
          ;; Greyscale
-         (let ((val (+ 8 (* (- 255 color) 10))))
+         (let ((val (+ 8 (* (- color 232) 10))))
            (format "#%02x%02x%02x"
                    val val val)))
         ((<= color 7)
@@ -170,16 +318,19 @@ if the property `xterm-color' is set. A possible way to install this would be:
                      (aref color-table green)
                      (aref color-table blue))))))
 
-(defun xterm-color-make-property (hash-table)
-  (let ((ret nil))
-    (maphash (lambda (k v)
-               (push (cons k v) ret))
-             hash-table)
+(defun xterm-color-make-property ()
+  (let ((ret nil)
+        (fg (gethash 'foreground-color xterm-color-current))
+        (bg (gethash 'background-color xterm-color-current)))
+    (macrolet ((get-color (color)
+                `(if (stringp ,color)
+                     ,color
+                   (aref xterm-color-names ,color))))
+      (when fg
+        (push `(foreground-color . ,(get-color fg)) ret))
+      (when bg
+        (push `(background-color . ,(get-color bg)) ret)))
     ret))
-
-(defun xterm-color-new-state (state)
-  (setq xterm-color-state state))
-
 
 (defun xterm-color-filter (string)
   "Translate ANSI color sequences in STRING into text properties.
@@ -191,120 +342,63 @@ Also see `xterm-color-unfontify-region'."
     (setq xterm-color-current (make-hash-table)))
   (let ((result nil))
     (macrolet ((insert (x) `(push ,x result))
-               (maybe-fontify
-                ()
-                `(when (> (length xterm-color-ring) 0)
-                   (if (> (hash-table-count xterm-color-current) 0)
-                       (insert (propertize xterm-color-ring 'xterm-color t
-                                           'face (xterm-color-make-property xterm-color-current)))
-                    (insert xterm-color-ring))
-                  (setq xterm-color-ring ""))))
+               (update (x place) `(setq ,place (concat ,place (string ,x))))
+               (new-state (state) `(setq xterm-color-state ,state))
+               (has-color? () `(or (> (hash-table-count xterm-color-current) 0)
+                                   (not (= xterm-color-attributes 0))))
+               (maybe-fontify ()
+                `(when (> (length xterm-color-char-buffer) 0)
+                   (if (has-color?)
+                       (insert (propertize xterm-color-char-buffer 'xterm-color t
+                                           'face (xterm-color-make-property)))
+                    (insert xterm-color-char-buffer))
+                  (setq xterm-color-char-buffer ""))))
       (loop for char across string do
             (case xterm-color-state
               (:char
                (cond
                 ((= char 27)            ; ESC
                  (maybe-fontify)
-                 (xterm-color-new-state :ansi-esc))
+                 (new-state :ansi-esc))
                 (t
-                 (if (> (hash-table-count xterm-color-current) 0)
-                     (setq xterm-color-ring
-                           (concat xterm-color-ring (string char)))
+                 (if (has-color?)
+                     (update char xterm-color-char-buffer)
                    (insert (string char))))))
               (:ansi-esc
                (cond ((= char ?\[)
-                      (xterm-color-new-state :ansi-var))
+                      (new-state :ansi-csi))
                      ((= char ?\])
-                      (insert (concat (string 27)
-                                      (string ?\])))
-                      (xterm-color-new-state :ansi-invalid-0))
+                      (new-state :ansi-osc))
                      (t
-                      (insert (string char)))))
-              (:ansi-invalid-0
-               (insert (string char))
-               (when (= char 59)
-                 (xterm-color-new-state :char)))
-              (:ansi-invalid
-               ;; Read and discard everything until we get m
-               (when (= char ?m)
-                 (xterm-color-new-state :char)))
-              (:ansi-var
-               (cond ((= char 59)       ; end of variable
-                      (let ((var (string-to-number xterm-color-var)))
-                        (setq xterm-color-var "")
-                        (xterm-color-dispatch-ansi-var var)))
-                     ((= char ?m)
-                      (cond ((string= "" xterm-color-var)
-                             ;; ANSI reset ESC[m
-                             (clrhash xterm-color-current))
-                            (t (let ((var (string-to-number xterm-color-var)))
-                                 (xterm-color-dispatch-ansi-var var)
-                                 (setq xterm-color-var ""))))
-                      (xterm-color-new-state :char))
-                     ((= char ?0)
-                      (setq xterm-color-var
-                            (concat xterm-color-var (string char)))
-                      (xterm-color-new-state :maybe-term-query))
-                     (t
-                      (setq xterm-color-var
-                            (concat xterm-color-var (string char))))))
-              (:maybe-term-query
-               (cond ((= char ?c)       ; ESC[0c query terminal, ignore
-                      (setq xterm-color-var "")
-                      (xterm-color-new-state :char))
-                     ((= char ?m)       ; XXX: bug here ;40m is not right
-                      (clrhash xterm-color-current)
-                      (setq xterm-color-var "")
-                      (xterm-color-new-state :char))
-                     (t (setq xterm-color-var
-                              (concat xterm-color-var (string char)))
-                        (xterm-color-new-state :ansi-var))))
-              (:xterm-fg
-               (cond ((= char ?5)
-                      (xterm-color-new-state :xterm-fg-1))
-                     (t
-                      (message "invalid ansi escape sequence: %s:%c" xterm-color-state char)
-                      (xterm-color-new-state :ansi-invalid))))
-              (:xterm-fg-1
-               (cond ((= char 59)
-                      (xterm-color-new-state :xterm-fg-2))
-                     (t
-                      (message "invalid ansi escape sequence: %s:%c" xterm-color-state char)
-                      (xterm-color-new-state :ansi-invalid))))
-              (:xterm-fg-2
-               (cond ((= char ?m)
-                      (puthash 'foreground-color
-                               (xterm-color-256 (string-to-number xterm-color-var))
-                               xterm-color-current)
-                      (xterm-color-new-state :char)
-                      (setq xterm-color-var ""))
-                     (t
-                      (setq xterm-color-var
-                            (concat xterm-color-var (string char))))))
-              (:xterm-bg
-               (cond ((= char ?5)
-                      (xterm-color-new-state :xterm-bg-1))
-                     (t
-                      (message "invalid ansi escape sequence: %s:%c" xterm-color-state char)
-                      (xterm-color-new-state :ansi-invalid))))
-              (:xterm-bg-1
-               (cond ((= char 59)
-                      (xterm-color-new-state :xterm-bg-2))
-                     (t
-                      (message "invalid ansi escape sequence: %s:%c" xterm-color-state char)
-                      (xterm-color-new-state :ansi-invalid))))
-              (:xterm-bg-2
-               (cond ((= char ?m)
-                      (puthash 'background-color
-                               (xterm-color-256 (string-to-number xterm-color-var))
-                               xterm-color-current)
-                      (xterm-color-new-state :char)
-                      (setq xterm-color-var ""))
-                     (t
-                      (setq xterm-color-var
-                            (concat xterm-color-var (string char))))))))
-      (when (eq xterm-color-state :char)
-        (maybe-fontify)))
+                      (update char xterm-color-char-buffer)
+                      (new-state :char))))
+              (:ansi-csi
+               (update char xterm-color-csi-buffer)
+               (when (and (>= char #x40)
+                          (<= char #x7e))
+                 ;; Dispatch
+                 (xterm-color-dispatch-csi xterm-color-csi-buffer)
+                 (setq xterm-color-csi-buffer "")
+                 (new-state :char)))
+              (:ansi-osc
+               ;; Read entire sequence
+               (update char xterm-color-osc-buffer)
+               (cond ((= char 7)
+                      ;; BEL
+                      (xterm-color-dispatch-osc xterm-color-osc-buffer)
+                      (setq xterm-color-osc-buffer "")
+                      (new-state :char))
+                     ((= char 27)
+                      ;; ESC
+                      (new-state :ansi-osc-esc))))
+              (:ansi-osc-esc
+               (update char xterm-color-osc-buffer)
+               (cond ((= char ?\\)
+                      (xterm-color-dispatch-osc xterm-color-osc-buffer)
+                      (setq xterm-color-osc-buffer "")
+                      (new-state :char))
+                     (t (new-state :ansi-osc))))))
+      (when (eq xterm-color-state :char) (maybe-fontify)))
     (mapconcat 'identity (nreverse result) "")))
 
 (provide 'xterm-color)
