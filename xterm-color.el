@@ -93,9 +93,8 @@
 ;; CUSTOM
 ;;
 
-(defcustom xterm-color-debug t
-  "Print ANSI state machine debug information in *Messages* if T.
-  This becomes buffer-local whenever it is set."
+(defcustom xterm-color-debug nil
+  "Print ANSI state machine debug information in *Messages* if T."
   :type 'boolean
   :group 'xterm-color)
 
@@ -118,7 +117,7 @@
 ;; 
 
 (defvar xterm-color-current nil
-  "Hash table with current ANSI color (fg, bg).")
+  "Hash table with current ANSI color.")
 
 (make-variable-buffer-local 'xterm-color-current)
 
