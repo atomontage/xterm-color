@@ -156,6 +156,8 @@ Once that happens, we generate a single text property for the entire string.")
 (defconst +xterm-color-underline+ 4)
 (defconst +xterm-color-strike+    8)
 (defconst +xterm-color-negative+  16)
+(defconst +xterm-color-frame+     32)
+(defconst +xterm-color-overline+  64)
 
 
 ;;
@@ -300,6 +302,30 @@ if the property `xterm-color' is set. A possible way to install this would be:
                             (logand xterm-color-attributes
                                     (lognot +xterm-color-strike+)))
                       (cdr elems))
+                     ((= 51 init)
+                      ;; Frame
+                      (setq xterm-color-attributes
+                            (logior xterm-color-attributes
+                                    +xterm-color-frame+))
+                      (cdr elems))
+                     ((= 53 init)
+                      ;; Overline
+                      (setq xterm-color-attributes
+                            (logior xterm-color-attributes
+                                    +xterm-color-overline+))
+                      (cdr elems))
+                     ((= 54 init)
+                      ;; No frame
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-frame+)))
+                      (cdr elems))
+                     ((= 55 init)
+                      ;; No overline
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-overline+)))
+                      (cdr elems))
                      (t (xterm-color-message "xterm-color: not implemented SGR attribute %s" init)
                         (cdr elems))))))
     (let* ((len (length csi))
@@ -323,10 +349,6 @@ if the property `xterm-color' is set. A possible way to install this would be:
             (t
              (xterm-color-message "xterm-color: %s CSI not implemented" csi))))))
 
-
-(defun xterm-color-dispatch-osc (osc)
-  ;; Do nothing, for now
-  )
 
 (defun xterm-color-256 (color)
   (cond ((and (>= color 232)
@@ -368,6 +390,10 @@ if the property `xterm-color' is set. A possible way to install this would be:
         (push `(:strike-through t) ret))
       (when (is-set? +xterm-color-negative+)
         (push `(:inverse-video t) ret))
+      (when (is-set? +xterm-color-overline+)
+        (push `(:overline t) ret))
+      (when (is-set? +xterm-color-frame+)
+        (push `(:box t) ret))
       (when fg
         (push `(:foreground ,(if (stringp fg)
                                  fg
@@ -433,7 +459,7 @@ Also see `xterm-color-unfontify-region'."
                (update char xterm-color-osc-buffer)
                (cond ((= char 7)
                       ;; BEL
-                      (xterm-color-dispatch-osc xterm-color-osc-buffer)
+                      ;(xterm-color-dispatch-osc xterm-color-osc-buffer)
                       (setq xterm-color-osc-buffer "")
                       (new-state :char))
                      ((= char 27)
@@ -442,7 +468,7 @@ Also see `xterm-color-unfontify-region'."
               (:ansi-osc-esc
                (update char xterm-color-osc-buffer)
                (cond ((= char ?\\)
-                      (xterm-color-dispatch-osc xterm-color-osc-buffer)
+                      ;(xterm-color-dispatch-osc xterm-color-osc-buffer)
                       (setq xterm-color-osc-buffer "")
                       (new-state :char))
                      (t (new-state :ansi-osc))))))
