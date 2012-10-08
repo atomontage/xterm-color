@@ -73,6 +73,8 @@
 ;; 
 ;;; Test:
 ;;
+;; M-x xterm-color-test
+;;
 ;; For comint:
 ;;
 ;; M-x shell
@@ -201,14 +203,16 @@ if the property `xterm-color' is set. A possible way to install this would be:
                       ;; Reset
                       (clrhash xterm-color-current)
                       (setq xterm-color-attributes 0)
-                      (rest elems))
+                      (cdr elems))
                      ((= 38 init)
                       ;; XTERM 256 FG color
-                      (setf (gethash 'foreground-color xterm-color-current) (xterm-color-256 (third elems)))
+                      (setf (gethash 'foreground-color xterm-color-current)
+                            (xterm-color-256 (third elems)))
                       (cdddr elems))
                      ((= 48 init)
                       ;; XTERM 256 BG color
-                      (setf (gethash 'background-color xterm-color-current) (xterm-color-256 (third elems)))
+                      (setf (gethash 'background-color xterm-color-current)
+                            (xterm-color-256 (third elems)))
                       (cdddr elems))
                      ((= 39 init)
                       ;; Reset to default FG color
@@ -221,67 +225,80 @@ if the property `xterm-color' is set. A possible way to install this would be:
                      ((and (>= init 30)
                            (<= init 37))
                       ;; ANSI FG color
-                      (setf (gethash 'foreground-color xterm-color-current) (- init 30))
+                      (setf (gethash 'foreground-color xterm-color-current)
+                            (- init 30))
                       (cdr elems))
                      ((and (>= init 40)
                            (<= init 47))
                       ;; ANSI BG color
-                      (setf (gethash 'background-color xterm-color-current) (- init 40))
+                      (setf (gethash 'background-color xterm-color-current)
+                            (- init 40))
                       (cdr elems))
                      ((= 1 init)
                       ;; Bright color
-                      (setq xterm-color-attributes (logior xterm-color-attributes
-                                                           +xterm-color-bright+))
+                      (setq xterm-color-attributes
+                            (logior xterm-color-attributes
+                                    +xterm-color-bright+))
                       (cdr elems))
                      ((= 2 init)
                       ;; Faint color, emulated as normal intensity
-                      (setq xterm-color-attributes (logand xterm-color-attributes
-                                                           (lognot +xterm-color-bright+)))
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-bright+)))
                       (cdr elems))
                      ((= 3 init)
                       ;; Italic
-                      (setq xterm-color-attributes (logior xterm-color-attributes
-                                                           +xterm-color-italic+))
+                      (setq xterm-color-attributes
+                            (logior xterm-color-attributes
+                                    +xterm-color-italic+))
                       (cdr elems))
                      ((= 4 init)
                       ;; Underline
-                      (setq xterm-color-attributes (logior xterm-color-attributes
-                                                           +xterm-color-underline+))
+                      (setq xterm-color-attributes
+                            (logior xterm-color-attributes
+                                    +xterm-color-underline+))
                       (cdr elems))
                      ((= 7 init)
                       ;; Negative
-                      (setq xterm-color-attributes (logior xterm-color-attributes
-                                                           +xterm-color-negative+))
+                      (setq xterm-color-attributes
+                            (logior xterm-color-attributes
+                                    +xterm-color-negative+))
                       (cdr elems))
                      ((= 9 init)
                       ;; Strike through
-                      (setq xterm-color-attributes (logior xterm-color-attributes
-                                                           +xterm-color-strike+))
+                      (setq xterm-color-attributes
+                            (logior xterm-color-attributes
+                                    +xterm-color-strike+))
                       (cdr elems))
                      ((= 22 init)
                       ;; Normal intensity
-                      (setq xterm-color-attributes (logand xterm-color-attributes
-                                                           (lognot +xterm-color-bright+)))
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-bright+)))
                       (cdr elems))
                      ((= 23 init)
                       ;; No italic
-                      (setq xterm-color-attributes (logand xterm-color-attributes
-                                                           (lognot +xterm-color-italic+)))
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-italic+)))
                       (cdr elems))
                      ((= 24 init)
                       ;; No underline
-                      (setq xterm-color-attributes (logand xterm-color-attributes
-                                                           (lognot +xterm-color-underline+)))
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-underline+)))
                       (cdr elems))
                      ((= 27 init)
                       ;; No negative
-                      (setq xterm-color-attributes (logand xterm-color-attributes
-                                                           (lognot +xterm-color-negative+)))
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-negative+)))
                       (cdr elems))
                      ((= 29 init)
                       ;; No strike through
-                      (setq xterm-color-attributes (logand xterm-color-attributes
-                                                           (lognot +xterm-color-strike+)))
+                      (setq xterm-color-attributes
+                            (logand xterm-color-attributes
+                                    (lognot +xterm-color-strike+)))
                       (cdr elems))
                      (t (xterm-color-message "xterm-color: not implemented SGR attribute %s" init)
                         (cdr elems))))))
