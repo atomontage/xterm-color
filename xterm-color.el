@@ -58,13 +58,13 @@
 ;;
 ;; You can replace ansi-color.el with xterm-color for all comint buffers:
 ;;
-;; comint install:
+;; + comint install
 ;;
 ;; (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
 ;;        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
 ;;        (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
 ;;
-;; comint uninstall:
+;; + comint uninstall
 ;;
 ;; (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
 ;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
@@ -475,6 +475,91 @@ Also see `xterm-color-unfontify-region'."
       (when (eq xterm-color-state :char) (maybe-fontify)))
     (mapconcat 'identity (nreverse result) "")))
 
+
+;;
+;; Tests
+;;
+
+
+(defun xterm-color--test-ansi ()
+  ;; System colors
+  (insert "* ANSI system colors\n\n")
+  (loop for color from 40 to 47 do
+        (insert (xterm-color-filter (format "[0;%sm  " color)))
+        finally (insert (xterm-color-filter "[0m\n\n")))
+
+  ;; Attributes (no color)
+  (insert "* ANSI attributes (default colors)\n\n")
+  (loop for (attrib . name) in '((1  . "bright")
+                                 (51 . "frame")
+                                 (3  . "italic")
+                                 (4  . "underline")
+                                 (7  . "negative")
+                                 (9  . "strike through")
+                                 (53 . "overline")) do
+                                 (insert (xterm-color-filter (format "[0;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+                                 finally (insert "\n"))
+  ;; Attributes (blue fg)
+  (insert "* ANSI attributes (blue foreground)\n\n")
+  (loop for (attrib . name) in '((1  . "bright")
+                                 (51 . "frame")
+                                 (3  . "italic")
+                                 (4  . "underline")
+                                 (7  . "negative")
+                                 (9  . "strike through")
+                                 (53 . "overline")) do
+                                 (insert (xterm-color-filter (format "[0;34;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+                                 finally (insert "\n"))
+  ;; Attributes (blue bg)
+  (insert "* ANSI attributes (blue background)\n\n")
+  (loop for (attrib . name) in '((1  . "bright")
+                                 (51 . "frame")
+                                 (3  . "italic")
+                                 (4  . "underline")
+                                 (7  . "negative")
+                                 (9  . "strike through")
+                                 (53 . "overline")) do
+                                 (insert (xterm-color-filter (format "[0;44;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+                                 finally (insert "\n")))
+
+(defun xterm-color--test-xterm ()
+  ;; Normal ANSI colors mapped to XTERM
+  (insert "* ANSI colors mapped to XTERM\n\n")
+  (loop for color from 0 to 7 do
+        (insert (xterm-color-filter (format "[48;5;%sm  " color)))
+        finally (insert (xterm-color-filter "[0m\n\n")))
+
+  ;; Bright ANSI colors mapped to XTERM
+  (insert "* ANSI bright colors mapped to XTERM\n\n")
+  (loop for color from 8 to 15 do
+        (insert (xterm-color-filter (format "[48;5;%sm  " color)))
+        finally (insert (xterm-color-filter "[0m\n\n")))
+
+  ;; XTERM 256 color cubes
+  (insert "*  XTERM 256 color cubes\n\n")
+  (loop for green from 0 to 5 do
+        (loop for red from 0 to 5 do
+              (loop for blue from 0 to 5
+                    for color = (+ 16 (* 36 red) (* green 6) blue) do
+                    (insert (xterm-color-filter (format "[48;5;%sm  [0m" color))))
+              (insert (xterm-color-filter "[0m ")))
+        (insert "\n"))
+  (insert "\n")
+  
+  (insert "*  XTERM color grayscale ramp\n\n")
+  (loop for color from 232 to 255 do
+        (insert (xterm-color-filter (format "[48;5;%sm  " color)))
+        finally (insert (xterm-color-filter "[0m\n\n"))))
+  
+(defun xterm-color-test ()
+  "Create and display a new buffer that demonstrates supported ANSI control
+sequences."
+  (interactive)
+  (let* ((name (generate-new-buffer-name "xterm-color-test"))
+         (buf (get-buffer-create name)))
+    (switch-to-buffer buf))
+  (xterm-color--test-ansi)
+  (xterm-color--test-xterm))
    
 (provide 'xterm-color)
 ;;; xterm-color.el ends here
