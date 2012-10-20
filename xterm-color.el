@@ -101,15 +101,27 @@
   :group 'xterm-color)
 
 (defcustom xterm-color-names
-  ;; black     red       green    yellow    blue      magenta    cyan     gray
-  ["#333333" "#cc3333" "#00ff99" "#ffff66" "#000099" "#ff66ff" "#00cccc" "#cccccc"]
-  "The default colors to use for regular ANSI colors."
+  ["#192033"    ; black
+   "#A62A3E"    ; red
+   "#38912B"    ; green
+   "#B27D12"    ; yellow
+   "#355C9A"    ; blue 
+   "#7C4F9F"    ; magenta
+   "#258F8F"    ; cyan
+   "#77858C"]   ; white
+  "the default colors to use for regular ANSI colors."
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
 (defcustom xterm-color-names-bright
-  ;; dark gray  red     green     yellow    blue      magenta   cyan      white
-  ["#666666" "#ff0000" "#00ff00" "#ffff33" "#0000ff" "#ff3399" "#00ffff" "#ffffff"]
+  ["#666666"    ; black
+   "#F04758"    ; red
+   "#93C724"    ; green
+   "#DDB62B"    ; yellow
+   "#45A3E6"    ; blue
+   "#C953EF"    ; magenta
+   "#60C6C8"    ; cyan
+   "#C0C0C0"]   ; white
   "The default colors to use for bright ANSI colors."
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
