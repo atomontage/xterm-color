@@ -109,7 +109,7 @@
    "#7C4F9F"    ; magenta
    "#258F8F"    ; cyan
    "#77858C"]   ; white
-  "the default colors to use for regular ANSI colors."
+  "The default colors to use as regular ANSI colors."
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
@@ -122,7 +122,7 @@
    "#C953EF"    ; magenta
    "#60C6C8"    ; cyan
    "#C0C0C0"]   ; white
-  "The default colors to use for bright ANSI colors."
+  "The default colors to use as bright ANSI colors."
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
@@ -564,8 +564,7 @@ Also see `xterm-color-unfontify-region'."
         finally (insert (xterm-color-filter "[0m\n\n"))))
   
 (defun xterm-color-test ()
-  "Create and display a new buffer that demonstrates supported ANSI control
-sequences."
+  "Create and display a new buffer that contains ANSI control sequences."
   (interactive)
   (let* ((name (generate-new-buffer-name "xterm-color-test"))
          (buf (get-buffer-create name)))
