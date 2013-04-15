@@ -487,52 +487,43 @@ Also see `xterm-color-unfontify-region'."
       (when (eq xterm-color-state :char) (maybe-fontify)))
     (mapconcat 'identity (nreverse result) "")))
 
-
 ;;
 ;; Tests
 ;;
 
+(lexical-let ((test-attributes
+               '((1  . "bright")
+                 (51 . "frame")
+                 (3  . "italic")
+                 (4  . "underline")
+                 (7  . "negative")
+                 (9  . "strike through")
+                 (53 . "overline"))))
+  
+  (defun xterm-color--test-ansi ()
+    ;; System colors
+    (insert "* ANSI system colors\n\n")
+    (loop for color from 40 to 47 do
+          (insert (xterm-color-filter (format "[0;%sm  " color)))
+          finally (insert (xterm-color-filter "[0m\n\n")))
 
-(defun xterm-color--test-ansi ()
-  ;; System colors
-  (insert "* ANSI system colors\n\n")
-  (loop for color from 40 to 47 do
-        (insert (xterm-color-filter (format "[0;%sm  " color)))
-        finally (insert (xterm-color-filter "[0m\n\n")))
-
-  ;; Attributes (no color)
-  (insert "* ANSI attributes (default colors)\n\n")
-  (loop for (attrib . name) in '((1  . "bright")
-                                 (51 . "frame")
-                                 (3  . "italic")
-                                 (4  . "underline")
-                                 (7  . "negative")
-                                 (9  . "strike through")
-                                 (53 . "overline")) do
-                                 (insert (xterm-color-filter (format "[0;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-                                 finally (insert "\n"))
-  ;; Attributes (blue fg)
-  (insert "* ANSI attributes (blue foreground)\n\n")
-  (loop for (attrib . name) in '((1  . "bright")
-                                 (51 . "frame")
-                                 (3  . "italic")
-                                 (4  . "underline")
-                                 (7  . "negative")
-                                 (9  . "strike through")
-                                 (53 . "overline")) do
-                                 (insert (xterm-color-filter (format "[0;34;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-                                 finally (insert "\n"))
-  ;; Attributes (blue bg)
-  (insert "* ANSI attributes (blue background)\n\n")
-  (loop for (attrib . name) in '((1  . "bright")
-                                 (51 . "frame")
-                                 (3  . "italic")
-                                 (4  . "underline")
-                                 (7  . "negative")
-                                 (9  . "strike through")
-                                 (53 . "overline")) do
-                                 (insert (xterm-color-filter (format "[0;44;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-                                 finally (insert "\n")))
+    ;; Attributes (no color)
+    (insert "* ANSI attributes (default colors)\n\n")
+    (loop for (attrib . name) in test-attributes do
+          (insert (xterm-color-filter (format "[0;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+          finally (insert "\n"))
+    
+    ;; Attributes (blue fg)
+    (insert "* ANSI attributes (blue foreground)\n\n")
+    (loop for (attrib . name) in test-attributes do
+          (insert (xterm-color-filter (format "[0;34;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+          finally (insert "\n"))
+    
+    ;; Attributes (blue bg)
+    (insert "* ANSI attributes (blue background)\n\n")
+    (loop for (attrib . name) in test-attributes do
+          (insert (xterm-color-filter (format "[0;44;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+          finally (insert "\n"))))
 
 (defun xterm-color--test-xterm ()
   ;; Normal ANSI colors mapped to XTERM
