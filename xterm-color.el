@@ -135,7 +135,7 @@
 
 (make-variable-buffer-local 'xterm-color--current)
 
-(defvar xterm-color-char--buffer ""
+(defvar xterm-color--char-buffer ""
   "Buffer with characters that the current ANSI color applies to.
 In order to avoid having per-character text properties, we grow this
 buffer dynamically until we encounter an ANSI reset sequence.
