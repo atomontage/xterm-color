@@ -338,6 +338,16 @@ if the property `xterm-color' is set. A possible way to install this would be:
                             (logand xterm-color--attributes
                                     (lognot +xterm-color--overline+)))
                       (cdr elems))
+                     ((and (>= init 90)
+                           (<= init 97))
+                      ;; AIXTERM hi-intensity FG color
+                      (setf (gethash 'foreground-color xterm-color--current)
+                            (- init 90))
+                      (setq xterm-color--attributes
+                            (logior xterm-color--attributes
+                                    +xterm-color--bright+))
+                      (cdr elems))
+                     
                      (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" init)
                         (cdr elems))))))
     (let* ((len (length csi))
