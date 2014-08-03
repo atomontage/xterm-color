@@ -1,14 +1,14 @@
 xterm-color.el is an ANSI control sequence to text-property translator
 
 * Features
-  - Regular ANSI color support
-  - XTERM 256 color support
-  - Bonus: Faster than ansi-color.el
+- Regular ANSI color support
+- XTERM 256 color support
+- Bonus: Faster than ansi-color.el
 
 * Usage 
 Call xterm-color-filter to propertize strings that you can then insert into
 a buffer. All state is kept in buffer-local variables which means that
-control sequences can span xterm-color-filter call boundaries.
+control sequences can span /xterm-color-filter/ call boundaries.
 
 Example:
 
@@ -20,24 +20,23 @@ Example:
 #+END_SRC
 
 If you are inserting into a buffer that has activated font locking, you need
-to set font-lock-unfontify-region-function to xterm-color-unfontify-region
+to set /font-lock-unfontify-region-function/ to /xterm-color-unfontify-region/
 
 You can replace ansi-color.el with xterm-color for all comint buffers:
 
 #+BEGIN_SRC emacs-lisp
-  ;; comint install
-  (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-         (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
-         (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
-  
-  ;; comint uninstall
-  (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-         (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
-         (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
+;; comint install
+(progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
+       (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
+       (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
+
+;; comint uninstall
+(progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
+       (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
+       (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
 #+END_SRC
 
 * Test
-
 #+BEGIN_SRC emacs-lisp
 M-x xterm-color-test
 
