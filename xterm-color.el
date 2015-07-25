@@ -70,7 +70,7 @@
 ;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
 ;;        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
 ;;
-;; 
+;;
 ;;; Test:
 ;;
 ;; M-x xterm-color-test
@@ -105,7 +105,7 @@
    "#A93F43"    ; red
    "#59963A"    ; green
    "#BE8A2D"    ; yellow
-   "#4068A3"    ; blue 
+   "#4068A3"    ; blue
    "#7F60A7"    ; magenta
    "#4E9B9B"    ; cyan
    "#7E8A90"]   ; white
@@ -128,7 +128,7 @@
 
 ;;
 ;; Buffer locals, used by state machine
-;; 
+;;
 
 (defvar xterm-color--current nil
   "Hash table with current ANSI color.")
@@ -174,7 +174,7 @@ Once that happens, we generate a single text property for the entire string.")
 
 ;;
 ;; Functions
-;; 
+;;
 
 
 (defun xterm-color--message (format-string &rest args)
@@ -199,15 +199,19 @@ if the property `xterm-color' is set. A possible way to install this would be:
 	  \(function (lambda ()
 		      \(setq font-lock-unfontify-region-function
 			    'xterm-color-unfontify-region))))"
+
   (when (boundp 'font-lock-syntactic-keywords)
-    (remove-text-properties beg end '(syntax-table nil)))
-  (while (setq beg (text-property-not-all beg end 'face nil))
-    (setq beg (or (text-property-not-all beg end 'xterm-color t) end))
-    (when (get-text-property beg 'face)
-      (let ((end-face (or (text-property-any beg end 'face nil)
-			  end)))
-	(remove-text-properties beg end-face '(face nil))
-	(setq beg end-face)))))
+    (remove-text-properties beg end '(syntax-table nil))))
+
+;; The following is only needed in Emacs 23
+
+  ;; (while (setq beg (text-property-not-all beg end 'face nil))
+  ;;   (setq beg (or (text-property-not-all beg end 'xterm-color t) end))
+  ;;   (when (get-text-property beg 'face)
+  ;;     (let ((end-face (or (text-property-any beg end 'face nil)
+  ;;       		  end)))
+  ;;       (remove-text-properties beg end-face '(face nil))
+  ;;       (setq beg end-face)))))
 
 
 (defun xterm-color--dispatch-csi (csi)
@@ -347,7 +351,7 @@ if the property `xterm-color' is set. A possible way to install this would be:
                             (logior xterm-color--attributes
                                     +xterm-color--bright+))
                       (cdr elems))
-                     
+
                      (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" init)
                         (cdr elems))))))
     (let* ((len (length csi))
@@ -437,7 +441,7 @@ Also see `xterm-color-unfontify-region'."
   (when (null xterm-color--current)
     (setq xterm-color--current (make-hash-table)))
   (let ((result nil))
-    (macrolet ((insert (x) `(push ,x result))
+    (macrolet ((output (x) `(push ,x result))
                (update (x place) `(setq ,place (concat ,place (string ,x))))
                (new-state (state) `(setq xterm-color--state ,state))
                (has-color? () `(or (> (hash-table-count xterm-color--current) 0)
@@ -445,9 +449,9 @@ Also see `xterm-color-unfontify-region'."
                (maybe-fontify ()
                 `(when (> (length xterm-color--char-buffer) 0)
                    (if (has-color?)
-                       (insert (propertize xterm-color--char-buffer 'xterm-color t
+                       (output (propertize xterm-color--char-buffer 'xterm-color t
                                            'face (xterm-color--make-property)))
-                    (insert xterm-color--char-buffer))
+                    (output xterm-color--char-buffer))
                   (setq xterm-color--char-buffer ""))))
       (loop for char across string do
             (case xterm-color--state
@@ -459,7 +463,7 @@ Also see `xterm-color-unfontify-region'."
                 (t
                  (if (has-color?)
                      (update char xterm-color--char-buffer)
-                   (insert (string char))))))
+                   (output (string char))))))
               (:ansi-esc
                (cond ((= char ?\[)
                       (new-state :ansi-csi))
@@ -509,7 +513,7 @@ Also see `xterm-color-unfontify-region'."
                  (7  . "negative")
                  (9  . "strike through")
                  (53 . "overline"))))
-  
+
   (defun xterm-color--test-ansi ()
     ;; System colors
     (insert "* ANSI system colors\n\n")
@@ -522,13 +526,13 @@ Also see `xterm-color-unfontify-region'."
     (loop for (attrib . name) in test-attributes do
           (insert (xterm-color-filter (format "[0;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
           finally (insert "\n"))
-    
+
     ;; Attributes (blue fg)
     (insert "* ANSI attributes (blue foreground)\n\n")
     (loop for (attrib . name) in test-attributes do
           (insert (xterm-color-filter (format "[0;34;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
           finally (insert "\n"))
-    
+
     ;; Attributes (blue bg)
     (insert "* ANSI attributes (blue background)\n\n")
     (loop for (attrib . name) in test-attributes do
@@ -558,12 +562,12 @@ Also see `xterm-color-unfontify-region'."
               (insert (xterm-color-filter "[0m ")))
         (insert "\n"))
   (insert "\n")
-  
+
   (insert "*  XTERM color grayscale ramp\n\n")
   (loop for color from 232 to 255 do
         (insert (xterm-color-filter (format "[48;5;%sm  " color)))
         finally (insert (xterm-color-filter "[0m\n\n"))))
-  
+
 (defun xterm-color-test ()
   "Create and display a new buffer that contains ANSI control sequences."
   (interactive)
@@ -572,6 +576,6 @@ Also see `xterm-color-unfontify-region'."
     (switch-to-buffer buf))
   (xterm-color--test-ansi)
   (xterm-color--test-xterm))
-   
+
 (provide 'xterm-color)
 ;;; xterm-color.el ends here
