@@ -199,20 +199,24 @@ if the property `xterm-color' is set. A possible way to install this would be:
 	  \(function (lambda ()
 		      \(setq font-lock-unfontify-region-function
 			    'xterm-color-unfontify-region))))"
-
-  (when (boundp 'font-lock-syntactic-keywords)
-    (remove-text-properties beg end '(syntax-table nil))))
+  (remove-list-of-text-properties
+   beg end (append
+	    font-lock-extra-managed-props
+	    (if font-lock-syntactic-keywords
+		'(syntax-table font-lock-multiline)
+	      '(font-lock-multiline)))))
 
 ;; The following is only needed in Emacs 23
-
-  ;; (while (setq beg (text-property-not-all beg end 'face nil))
-  ;;   (setq beg (or (text-property-not-all beg end 'xterm-color t) end))
-  ;;   (when (get-text-property beg 'face)
-  ;;     (let ((end-face (or (text-property-any beg end 'face nil)
-  ;;       		  end)))
-  ;;       (remove-text-properties beg end-face '(face nil))
-  ;;       (setq beg end-face)))))
-
+(defun xterm-color-unfontify-region-23 (beg end)
+  (when (boundp 'font-lock-syntactic-keywords)
+    (remove-text-properties beg end '(syntax-table nil)))
+  (while (setq beg (text-property-not-all beg end 'face nil))
+    (setq beg (or (text-property-not-all beg end 'xterm-color t) end))
+    (when (get-text-property beg 'face)
+      (let ((end-face (or (text-property-any beg end 'face nil)
+                          end)))
+        (remove-text-properties beg end-face '(face nil))
+        (setq beg end-face)))))
 
 (defun xterm-color--dispatch-csi (csi)
   (labels ((dispatch-SGR (elems)
