@@ -25,6 +25,8 @@ to set /font-lock-unfontify-region-function/ to /xterm-color-unfontify-region/
 You can replace ansi-color.el with xterm-color for all comint buffers:
 
 #+BEGIN_SRC emacs-lisp
+;;; User xterm-color-unfontify-region-23 on Emacs 23.x
+
 ;; comint install
 (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))

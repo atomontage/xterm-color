@@ -199,21 +199,34 @@ if the property `xterm-color' is set. A possible way to install this would be:
 	  \(function (lambda ()
 		      \(setq font-lock-unfontify-region-function
 			    'xterm-color-unfontify-region))))"
+  ;; This will keep face property
   (remove-list-of-text-properties
    beg end (append
 	    font-lock-extra-managed-props
 	    (if font-lock-syntactic-keywords
 		'(syntax-table font-lock-multiline)
-	      '(font-lock-multiline)))))
+	      '(font-lock-multiline))))
+  ;; Second pass: remove face property where xterm-color property is not present
+  (while (setq beg (text-property-not-all beg end 'face nil))
+    (setq beg (or (text-property-not-all beg end 'xterm-color t)
+                  end))
+    (when (get-text-property beg 'face)
+      (let ((end-face (or (text-property-any beg end 'xterm-color t)
+                          (text-property-any beg end 'face nil)
+                          end)))
+        (remove-text-properties beg end-face '(face nil))
+        (setq beg end-face)))))
 
 ;; The following is only needed in Emacs 23
 (defun xterm-color-unfontify-region-23 (beg end)
   (when (boundp 'font-lock-syntactic-keywords)
     (remove-text-properties beg end '(syntax-table nil)))
   (while (setq beg (text-property-not-all beg end 'face nil))
-    (setq beg (or (text-property-not-all beg end 'xterm-color t) end))
+    (setq beg (or (text-property-not-all beg end 'xterm-color t)
+                  end))
     (when (get-text-property beg 'face)
-      (let ((end-face (or (text-property-any beg end 'face nil)
+      (let ((end-face (or (text-property-any beg end 'xterm-color t)
+                          (text-property-any beg end 'face nil)
                           end)))
         (remove-text-properties beg end-face '(face nil))
         (setq beg end-face)))))
