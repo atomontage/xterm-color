@@ -55,10 +55,11 @@
 ;; If you are inserting into a buffer that has activated font locking, you need
 ;; to set font-lock-unfontify-region-function to xterm-color-unfontify-region
 ;;
-;;
 ;; You can replace ansi-color.el with xterm-color for all comint buffers:
 ;;
 ;; + comint install
+;;
+;;; Use xterm-color-unfontify-region-23 on Emacs 23.x
 ;;
 ;; (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
 ;;        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
@@ -70,17 +71,29 @@
 ;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
 ;;        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
 ;;
+;; Also set TERM accordingly (xterm-256color)
+;;
+;; + You can also use it with eshell (and thus get color output from system ls):
+;;
+;; (add-hook 'eshell-mode-hook
+;;           (lambda ()
+;;             (setq xterm-color-preserve-properties t)))
+;;
+;;  (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
+;;  (setq eshell-output-filter-functions (remove 'eshell-handle-ansi-color eshell-output-filter-functions))
+;;
+;;  Don't forget to setenv TERM xterm-256color
 ;;
 ;;; Test:
 ;;
 ;; M-x xterm-color-test
 ;;
-;; For comint:
+;; For comint or eshell:
 ;;
-;; M-x shell
-;; wget http://www.frexx.de/xterm-256-notes/data/256colors2.pl
-;; wget http://www.frexx.de/xterm-256-notes/data/xterm-colortest
-;; perl xterm-colortest && perl 256colors2.pl
+;; M-x shell || M-x eshell
+;;
+;; perl tests/xterm-colortest && perl tests/256colors2.pl
+;;
 ;;
 ;;; Code:
 
@@ -135,6 +148,14 @@
 
 (make-variable-buffer-local 'xterm-color--current)
 
+(defvar xterm-color-preserve-properties nil
+  "If T, preserve existing text properties on input about to be filtered.
+This should be NIL most of the time as it can mess up the internal state
+machine if it encounters ANSI data with text properties applied. It is
+really meant for and works fine with eshell.")
+
+(make-variable-buffer-local 'xterm-color-preserve-properties)
+
 (defvar xterm-color--char-buffer ""
   "Buffer with characters that the current ANSI color applies to.
 In order to avoid having per-character text properties, we grow this
@@ -175,6 +196,18 @@ Once that happens, we generate a single text property for the entire string.")
 ;;
 ;; Functions
 ;;
+
+(defun* xterm-color--string-properties (string)
+  (loop with res = '()
+        with pos = 0 do
+        (let ((next-pos (next-property-change pos string)))
+          (if next-pos
+              (progn
+                (push (list pos (text-properties-at pos string) (substring string pos next-pos)) res)
+                (setq pos next-pos))
+            (progn
+              (push (list pos (text-properties-at pos string) (substring string pos)) res)
+              (return-from xterm-color--string-properties (nreverse res)))))))
 
 
 (defun xterm-color--message (format-string &rest args)
@@ -232,7 +265,7 @@ if the property `xterm-color' is set. A possible way to install this would be:
         (setq beg end-face)))))
 
 (defun xterm-color--dispatch-csi (csi)
-  (labels ((dispatch-SGR (elems)
+  (cl-labels ((dispatch-SGR (elems)
              (let ((init (first elems)))
                (cond ((= 0 init)
                       ;; Reset
@@ -449,12 +482,11 @@ if the property `xterm-color' is set. A possible way to install this would be:
               ret)))
     ret))
 
-(defun xterm-color-filter (string)
+(defun xterm-color-filter-real (string)
   "Translate ANSI color sequences in STRING into text properties.
 Returns new STRING with text properties applied.
 
-This can be inserted into `comint-preoutput-filter-functions'.
-Also see `xterm-color-unfontify-region'."
+This function strips text properties that may be present in STRING."
   (when (null xterm-color--current)
     (setq xterm-color--current (make-hash-table)))
   (let ((result nil))
@@ -517,6 +549,29 @@ Also see `xterm-color-unfontify-region'."
                      (t (new-state :ansi-osc))))))
       (when (eq xterm-color--state :char) (maybe-fontify)))
     (mapconcat 'identity (nreverse result) "")))
+
+
+(defun xterm-color-filter (string)
+  "Translate ANSI color sequences in STRING into text properties.
+Returns new STRING with text properties applied.
+
+This function will check if `xterm-color-preserve-properties' is
+set to T and only call `xterm-color-filter-real' on substrings
+that do not have text properties applied (passing through the rest
+unmodified). Preserving properties in this fashion is really a hack
+and not very robust as there may be situations where text properties
+are applied on ANSI data, which will mess up the state machine.
+It works fine with and is really meant for eshell though.
+
+This can be inserted into `comint-preoutput-filter-functions'.
+Also see `xterm-color-unfontify-region'."
+  (if (not xterm-color-preserve-properties)
+      (xterm-color-filter-real string)
+    (loop with res = nil
+          for (_ props substring) in (xterm-color--string-properties string) do
+          (push (if props substring (xterm-color-filter-real substring))
+                res)
+          finally (return (mapconcat 'identity (nreverse res) "")))))
 
 ;;
 ;; Tests

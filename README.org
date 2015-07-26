@@ -25,7 +25,7 @@ to set /font-lock-unfontify-region-function/ to /xterm-color-unfontify-region/
 You can replace ansi-color.el with xterm-color for all comint buffers:
 
 #+BEGIN_SRC emacs-lisp
-;;; User xterm-color-unfontify-region-23 on Emacs 23.x
+;;; Use xterm-color-unfontify-region-23 on Emacs 23.x
 
 ;; comint install
 (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
@@ -36,18 +36,32 @@ You can replace ansi-color.el with xterm-color for all comint buffers:
 (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
+
+;; Also set TERM accordingly (xterm-256color)
+
+;; + You can also use it with eshell (and thus get color output from system ls):
+
+(add-hook 'eshell-mode-hook
+          (lambda ()
+            (setq xterm-color-preserve-properties t)))
+
+(add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
+(setq eshell-output-filter-functions (remove 'eshell-handle-ansi-color eshell-output-filter-functions))
+
+;;  Don't forget to setenv TERM xterm-256color
+
 #+END_SRC
 
 * Test
 #+BEGIN_SRC emacs-lisp
 M-x xterm-color-test
 
-For comint:
+For comint or eshell:
 
-M-x shell
-wget http://www.frexx.de/xterm-256-notes/data/256colors2.pl
-wget http://www.frexx.de/xterm-256-notes/data/xterm-colortest
-perl xterm-colortest && perl 256colors2.pl
+M-x shell || M-x eshell
+
+perl tests/xterm-colortest && perl tests/256colors2.pl
+
 #+END_SRC
 
 [[file:xterm-color.png][file:xterm-thumb.png]]
