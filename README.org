@@ -39,7 +39,7 @@ You can replace ansi-color.el with xterm-color for all comint buffers:
 
 ;; Also set TERM accordingly (xterm-256color)
 
-;; + You can also use it with eshell (and thus get color output from system ls):
+;; You can also use it with eshell (and thus get color output from system ls):
 
 (add-hook 'eshell-mode-hook
           (lambda ()
