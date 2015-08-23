@@ -647,7 +647,8 @@ Also see `xterm-color-unfontify-region'."
          (buf (get-buffer-create name)))
     (switch-to-buffer buf))
   (xterm-color--test-ansi)
-  (xterm-color--test-xterm))
+  (xterm-color--test-xterm)
+  (setq buffer-read-only t))
 
 (provide 'xterm-color)
 ;;; xterm-color.el ends here
