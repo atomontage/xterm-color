@@ -197,7 +197,7 @@ Once that happens, we generate a single text property for the entire string.")
 ;; Functions
 ;;
 
-(defun* xterm-color--string-properties (string)
+(cl-defun xterm-color--string-properties (string)
   (loop with res = '()
         with pos = 0 do
         (let ((next-pos (next-property-change pos string)))
