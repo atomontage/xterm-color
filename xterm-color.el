@@ -1,8 +1,8 @@
 ;;; xterm-color.el --- ANSI & XTERM 256 color support
-
+;;
 ;; Copyright (C) 2010 xristos@sdf.lonestar.org
 ;; All rights reserved
-
+;;
 ;; Version: 1.0 - 2012-07-07
 ;; Author: xristos@sdf.lonestar.org
 ;;
@@ -74,6 +74,8 @@
 ;; Also set TERM accordingly (xterm-256color)
 ;;
 ;; + You can also use it with eshell (and thus get color output from system ls):
+;;
+;; (require 'eshell)
 ;;
 ;; (add-hook 'eshell-mode-hook
 ;;           (lambda ()
@@ -205,10 +207,8 @@ Once that happens, we generate a single text property for the entire string.")
               (progn
                 (push (list pos (text-properties-at pos string) (substring string pos next-pos)) res)
                 (setq pos next-pos))
-            (progn
-              (push (list pos (text-properties-at pos string) (substring string pos)) res)
-              (return-from xterm-color--string-properties (nreverse res)))))))
-
+            (push (list pos (text-properties-at pos string) (substring string pos)) res)
+            (return-from xterm-color--string-properties (nreverse res))))))
 
 (defun xterm-color--message (format-string &rest args)
   "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is T."
