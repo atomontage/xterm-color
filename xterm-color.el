@@ -236,7 +236,7 @@ if the property `xterm-color' is set. A possible way to install this would be:
   (remove-list-of-text-properties
    beg end (append
 	    font-lock-extra-managed-props
-	    (if syntax-propertize-function
+	    (if font-lock-syntactic-keywords
 		'(syntax-table font-lock-multiline)
 	      '(font-lock-multiline))))
   ;; Second pass: remove face property where xterm-color property is not present
@@ -252,7 +252,7 @@ if the property `xterm-color' is set. A possible way to install this would be:
 
 ;; The following is only needed in Emacs 23
 (defun xterm-color-unfontify-region-23 (beg end)
-  (when (boundp 'syntax-propertize-function)
+  (when (boundp 'font-lock-syntactic-keywords)
     (remove-text-properties beg end '(syntax-table nil)))
   (while (setq beg (text-property-not-all beg end 'face nil))
     (setq beg (or (text-property-not-all beg end 'xterm-color t)
