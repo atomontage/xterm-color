@@ -5,6 +5,7 @@
 ;;
 ;; Version: 1.0 - 2012-07-07
 ;; Author: xristos@sdf.lonestar.org
+;; Package-Requires: ((cl-lib "0.5"))
 ;;
 ;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions
@@ -98,6 +99,9 @@
 ;;
 ;;
 ;;; Code:
+
+(eval-when-compile
+  (require 'cl)) ;; for lexical-let
 
 (require 'cl-lib)
 
@@ -200,15 +204,15 @@ Once that happens, we generate a single text property for the entire string.")
 ;;
 
 (cl-defun xterm-color--string-properties (string)
-  (loop with res = '()
-        with pos = 0 do
-        (let ((next-pos (next-property-change pos string)))
-          (if next-pos
-              (progn
-                (push (list pos (text-properties-at pos string) (substring string pos next-pos)) res)
-                (setq pos next-pos))
-            (push (list pos (text-properties-at pos string) (substring string pos)) res)
-            (return-from xterm-color--string-properties (nreverse res))))))
+  (cl-loop with res = '()
+	   with pos = 0 do
+	   (let ((next-pos (next-property-change pos string)))
+	     (if next-pos
+		 (progn
+		   (push (list pos (text-properties-at pos string) (substring string pos next-pos)) res)
+		   (setq pos next-pos))
+	       (push (list pos (text-properties-at pos string) (substring string pos)) res)
+	       (return-from xterm-color--string-properties (nreverse res))))))
 
 (defun xterm-color--message (format-string &rest args)
   "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is T."
@@ -502,51 +506,51 @@ This function strips text properties that may be present in STRING."
                                            'face (xterm-color--make-property)))
                     (output xterm-color--char-buffer))
                   (setq xterm-color--char-buffer ""))))
-      (loop for char across string do
-            (case xterm-color--state
-              (:char
-               (cond
-                ((= char 27)            ; ESC
-                 (maybe-fontify)
-                 (new-state :ansi-esc))
-                (t
-                 (if (has-color?)
-                     (update char xterm-color--char-buffer)
-                   (output (string char))))))
-              (:ansi-esc
-               (cond ((= char ?\[)
-                      (new-state :ansi-csi))
-                     ((= char ?\])
-                      (new-state :ansi-osc))
-                     (t
-                      (update char xterm-color--char-buffer)
-                      (new-state :char))))
-              (:ansi-csi
-               (update char xterm-color--csi-buffer)
-               (when (and (>= char #x40)
-                          (<= char #x7e))
-                 ;; Dispatch
-                 (xterm-color--dispatch-csi xterm-color--csi-buffer)
-                 (setq xterm-color--csi-buffer "")
-                 (new-state :char)))
-              (:ansi-osc
-               ;; Read entire sequence
-               (update char xterm-color--osc-buffer)
-               (cond ((= char 7)
-                      ;; BEL
-                      ;(xterm-color--dispatch-osc xterm-color--osc-buffer)
-                      (setq xterm-color--osc-buffer "")
-                      (new-state :char))
-                     ((= char 27)
-                      ;; ESC
-                      (new-state :ansi-osc-esc))))
-              (:ansi-osc-esc
-               (update char xterm-color--osc-buffer)
-               (cond ((= char ?\\)
-                      ;(xterm-color--dispatch-osc xterm-color--osc-buffer)
-                      (setq xterm-color--osc-buffer "")
-                      (new-state :char))
-                     (t (new-state :ansi-osc))))))
+      (cl-loop for char across string do
+	       (cl-case xterm-color--state
+		 (:char
+		  (cond
+		   ((= char 27)		; ESC
+		    (maybe-fontify)
+		    (new-state :ansi-esc))
+		   (t
+		    (if (has-color?)
+			(update char xterm-color--char-buffer)
+		      (output (string char))))))
+		 (:ansi-esc
+		  (cond ((= char ?\[)
+			 (new-state :ansi-csi))
+			((= char ?\])
+			 (new-state :ansi-osc))
+			(t
+			 (update char xterm-color--char-buffer)
+			 (new-state :char))))
+		 (:ansi-csi
+		  (update char xterm-color--csi-buffer)
+		  (when (and (>= char #x40)
+			     (<= char #x7e))
+		    ;; Dispatch
+		    (xterm-color--dispatch-csi xterm-color--csi-buffer)
+		    (setq xterm-color--csi-buffer "")
+		    (new-state :char)))
+		 (:ansi-osc
+		  ;; Read entire sequence
+		  (update char xterm-color--osc-buffer)
+		  (cond ((= char 7)
+			 ;; BEL
+					;(xterm-color--dispatch-osc xterm-color--osc-buffer)
+			 (setq xterm-color--osc-buffer "")
+			 (new-state :char))
+			((= char 27)
+			 ;; ESC
+			 (new-state :ansi-osc-esc))))
+		 (:ansi-osc-esc
+		  (update char xterm-color--osc-buffer)
+		  (cond ((= char ?\\)
+					;(xterm-color--dispatch-osc xterm-color--osc-buffer)
+			 (setq xterm-color--osc-buffer "")
+			 (new-state :char))
+			(t (new-state :ansi-osc))))))
       (when (eq xterm-color--state :char) (maybe-fontify)))
     (mapconcat 'identity (nreverse result) "")))
 
@@ -567,11 +571,11 @@ This can be inserted into `comint-preoutput-filter-functions'.
 Also see `xterm-color-unfontify-region'."
   (if (not xterm-color-preserve-properties)
       (xterm-color-filter-real string)
-    (loop with res = nil
-          for (_ props substring) in (xterm-color--string-properties string) do
-          (push (if props substring (xterm-color-filter-real substring))
-                res)
-          finally (return (mapconcat 'identity (nreverse res) "")))))
+    (cl-loop with res = nil
+	     for (_ props substring) in (xterm-color--string-properties string) do
+	     (push (if props substring (xterm-color-filter-real substring))
+		   res)
+	     finally (return (mapconcat 'identity (nreverse res) "")))))
 
 ;;
 ;; Tests
@@ -589,56 +593,56 @@ Also see `xterm-color-unfontify-region'."
   (defun xterm-color--test-ansi ()
     ;; System colors
     (insert "* ANSI system colors\n\n")
-    (loop for color from 40 to 47 do
-          (insert (xterm-color-filter (format "[0;%sm  " color)))
-          finally (insert (xterm-color-filter "[0m\n\n")))
+    (cl-loop for color from 40 to 47 do
+	     (insert (xterm-color-filter (format "[0;%sm  " color)))
+	     finally (insert (xterm-color-filter "[0m\n\n")))
 
     ;; Attributes (no color)
     (insert "* ANSI attributes (default colors)\n\n")
-    (loop for (attrib . name) in test-attributes do
-          (insert (xterm-color-filter (format "[0;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-          finally (insert "\n"))
+    (cl-loop for (attrib . name) in test-attributes do
+	     (insert (xterm-color-filter (format "[0;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+	     finally (insert "\n"))
 
     ;; Attributes (blue fg)
     (insert "* ANSI attributes (blue foreground)\n\n")
-    (loop for (attrib . name) in test-attributes do
-          (insert (xterm-color-filter (format "[0;34;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-          finally (insert "\n"))
+    (cl-loop for (attrib . name) in test-attributes do
+	     (insert (xterm-color-filter (format "[0;34;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+	     finally (insert "\n"))
 
     ;; Attributes (blue bg)
     (insert "* ANSI attributes (blue background)\n\n")
-    (loop for (attrib . name) in test-attributes do
-          (insert (xterm-color-filter (format "[0;44;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-          finally (insert "\n"))))
+    (cl-loop for (attrib . name) in test-attributes do
+	     (insert (xterm-color-filter (format "[0;44;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
+	     finally (insert "\n"))))
 
 (defun xterm-color--test-xterm ()
   ;; Normal ANSI colors mapped to XTERM
   (insert "* ANSI colors mapped to XTERM\n\n")
-  (loop for color from 0 to 7 do
-        (insert (xterm-color-filter (format "[48;5;%sm  " color)))
-        finally (insert (xterm-color-filter "[0m\n\n")))
+  (cl-loop for color from 0 to 7 do
+	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
+	   finally (insert (xterm-color-filter "[0m\n\n")))
 
   ;; Bright ANSI colors mapped to XTERM
   (insert "* ANSI bright colors mapped to XTERM\n\n")
-  (loop for color from 8 to 15 do
-        (insert (xterm-color-filter (format "[48;5;%sm  " color)))
-        finally (insert (xterm-color-filter "[0m\n\n")))
+  (cl-loop for color from 8 to 15 do
+	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
+	   finally (insert (xterm-color-filter "[0m\n\n")))
 
   ;; XTERM 256 color cubes
   (insert "*  XTERM 256 color cubes\n\n")
-  (loop for green from 0 to 5 do
-        (loop for red from 0 to 5 do
-              (loop for blue from 0 to 5
-                    for color = (+ 16 (* 36 red) (* green 6) blue) do
-                    (insert (xterm-color-filter (format "[48;5;%sm  [0m" color))))
-              (insert (xterm-color-filter "[0m ")))
-        (insert "\n"))
+  (cl-loop for green from 0 to 5 do
+	   (cl-loop for red from 0 to 5 do
+		    (cl-loop for blue from 0 to 5
+			     for color = (+ 16 (* 36 red) (* green 6) blue) do
+			     (insert (xterm-color-filter (format "[48;5;%sm  [0m" color))))
+		    (insert (xterm-color-filter "[0m ")))
+	   (insert "\n"))
   (insert "\n")
 
   (insert "*  XTERM color grayscale ramp\n\n")
-  (loop for color from 232 to 255 do
-        (insert (xterm-color-filter (format "[48;5;%sm  " color)))
-        finally (insert (xterm-color-filter "[0m\n\n"))))
+  (cl-loop for color from 232 to 255 do
+	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
+	   finally (insert (xterm-color-filter "[0m\n\n"))))
 
 (defun xterm-color-test ()
   "Create and display a new buffer that contains ANSI control sequences."
