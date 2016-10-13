@@ -19,23 +19,20 @@ Example:
 (xterm-color-filter "[0m")
 #+END_SRC
 
-If you are inserting into a buffer that has activated font locking, you need
-to set /font-lock-unfontify-region-function/ to /xterm-color-unfontify-region/
+If you are inserting into a buffer that has activated font locking, you
+*NO LONGER* need to set /font-lock-unfontify-region-function/ to
+/xterm-color-unfontify-region/ as the latter has been removed.
 
 You can replace ansi-color.el with xterm-color for all comint buffers:
 
 #+BEGIN_SRC emacs-lisp
-;;; Use xterm-color-unfontify-region-23 on Emacs 23.x
-
 ;; comint install
 (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-       (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
-       (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
+       (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions)))
 
 ;; comint uninstall
 (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-       (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
-       (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
+       (add-to-list 'comint-output-filter-functions 'ansi-color-process-output))
 
 ;; Also set TERM accordingly (xterm-256color)
 
