@@ -53,24 +53,17 @@
 ;; (xterm-color-filter ";mThis is only a test")
 ;; (xterm-color-filter "[0m")
 ;;
-;; If you are inserting into a buffer that has activated font locking, you need
-;; to set font-lock-unfontify-region-function to xterm-color-unfontify-region
-;;
 ;; You can replace ansi-color.el with xterm-color for all comint buffers:
 ;;
 ;; + comint install
 ;;
-;;; Use xterm-color-unfontify-region-23 on Emacs 23.x
-;;
 ;; (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-;;        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions))
-;;        (setq font-lock-unfontify-region-function 'xterm-color-unfontify-region))
+;;        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions)))
 ;;
 ;; + comint uninstall
 ;;
 ;; (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output)
-;;        (setq font-lock-unfontify-region-function 'font-lock-default-unfontify-region))
+;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output))
 ;;
 ;; Also set TERM accordingly (xterm-256color)
 ;;
@@ -101,7 +94,7 @@
 ;;; Code:
 
 (eval-when-compile
-  (require 'cl)) ;; for lexical-let
+  (require 'cl))                        ; for lexical-let
 
 (require 'cl-lib)
 
@@ -198,7 +191,6 @@ Once that happens, we generate a single text property for the entire string.")
 (defconst +xterm-color--frame+     32)
 (defconst +xterm-color--overline+  64)
 
-
 ;;
 ;; Functions
 ;;
@@ -220,53 +212,6 @@ Once that happens, we generate a single text property for the entire string.")
     (let ((message-truncate-lines t))
       (apply 'message format-string args)
       (message nil))))
-
-(defun xterm-color-unfontify-region (beg end)
-  "Replacement function for `font-lock-default-unfontify-region'.
-When font-lock is active in a buffer, you cannot simply add
-face text properties to the buffer.  Font-lock will remove the face
-text property using `font-lock-unfontify-region-function'.  If you want
-to insert the string returned by `xterm-color-filter' into such buffers,
-you must set `font-lock-unfontify-region-function' to
-`xterm-color-unfontify-region'.  This function will not remove all face
-text properties unconditionally.  It will keep the face text properties
-if the property `xterm-color' is set. A possible way to install this would be:
-
-\(add-hook 'font-lock-mode-hook
-	  \(function (lambda ()
-		      \(setq font-lock-unfontify-region-function
-			    'xterm-color-unfontify-region))))"
-  ;; This will keep face property
-  (remove-list-of-text-properties
-   beg end (append
-	    font-lock-extra-managed-props
-	    (if font-lock-syntactic-keywords
-		'(syntax-table font-lock-multiline)
-	      '(font-lock-multiline))))
-  ;; Second pass: remove face property where xterm-color property is not present
-  (while (setq beg (text-property-not-all beg end 'face nil))
-    (setq beg (or (text-property-not-all beg end 'xterm-color t)
-                  end))
-    (when (get-text-property beg 'face)
-      (let ((end-face (or (text-property-any beg end 'xterm-color t)
-                          (text-property-any beg end 'face nil)
-                          end)))
-        (remove-text-properties beg end-face '(face nil))
-        (setq beg end-face)))))
-
-;; The following is only needed in Emacs 23
-(defun xterm-color-unfontify-region-23 (beg end)
-  (when (boundp 'font-lock-syntactic-keywords)
-    (remove-text-properties beg end '(syntax-table nil)))
-  (while (setq beg (text-property-not-all beg end 'face nil))
-    (setq beg (or (text-property-not-all beg end 'xterm-color t)
-                  end))
-    (when (get-text-property beg 'face)
-      (let ((end-face (or (text-property-any beg end 'xterm-color t)
-                          (text-property-any beg end 'face nil)
-                          end)))
-        (remove-text-properties beg end-face '(face nil))
-        (setq beg end-face)))))
 
 (defun xterm-color--dispatch-csi (csi)
   (cl-labels ((dispatch-SGR (elems)
@@ -503,7 +448,7 @@ This function strips text properties that may be present in STRING."
                 `(when (> (length xterm-color--char-buffer) 0)
                    (if (has-color?)
                        (output (propertize xterm-color--char-buffer 'xterm-color t
-                                           'face (xterm-color--make-property)))
+                                           (if font-lock-mode 'font-lock-face 'face) (xterm-color--make-property)))
                     (output xterm-color--char-buffer))
                   (setq xterm-color--char-buffer ""))))
       (cl-loop for char across string do
@@ -567,8 +512,7 @@ and not very robust as there may be situations where text properties
 are applied on ANSI data, which will mess up the state machine.
 It works fine with and is really meant for eshell though.
 
-This can be inserted into `comint-preoutput-filter-functions'.
-Also see `xterm-color-unfontify-region'."
+This can be inserted into `comint-preoutput-filter-functions'."
   (if (not xterm-color-preserve-properties)
       (xterm-color-filter-real string)
     (cl-loop with res = nil
