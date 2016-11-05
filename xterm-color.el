@@ -189,7 +189,7 @@
 (defvar xterm-color-preserve-properties nil
   "If T, preserve existing text properties on input about to be filtered.
 This should be NIL most of the time as it can mess up the internal state
-machine if it encounters ANSI data with text properties applied. It is
+machine if it encounters ANSI data with text properties applied.  It is
 really meant for and works fine with eshell.")
 
 (make-variable-buffer-local 'xterm-color-preserve-properties)
@@ -243,7 +243,7 @@ Once that happens, we generate a single text property for the entire string.")
 		   (push (list pos (text-properties-at pos string) (substring string pos next-pos)) res)
 		   (setq pos next-pos))
 	       (push (list pos (text-properties-at pos string) (substring string pos)) res)
-	       (return-from xterm-color--string-properties (nreverse res))))))
+	       (cl-return-from xterm-color--string-properties (nreverse res))))))
 
 (defun xterm-color--message (format-string &rest args)
   "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is T."
@@ -254,7 +254,7 @@ Once that happens, we generate a single text property for the entire string.")
 
 (defun xterm-color--dispatch-csi (csi)
   (cl-labels ((dispatch-SGR (elems)
-             (let ((init (first elems)))
+             (let ((init (cl-first elems)))
                (cond ((= 0 init)
                       ;; Reset
                       (clrhash xterm-color--current)
@@ -263,13 +263,13 @@ Once that happens, we generate a single text property for the entire string.")
                      ((= 38 init)
                       ;; XTERM 256 FG color
                       (setf (gethash 'foreground-color xterm-color--current)
-                            (xterm-color--256 (third elems)))
-                      (cdddr elems))
+                            (xterm-color--256 (cl-third elems)))
+                      (cl-cdddr elems))
                      ((= 48 init)
                       ;; XTERM 256 BG color
                       (setf (gethash 'background-color xterm-color--current)
-                            (xterm-color--256 (third elems)))
-                      (cdddr elems))
+                            (xterm-color--256 (cl-third elems)))
+                      (cl-cdddr elems))
                      ((= 39 init)
                       ;; Reset to default FG color
                       (remhash 'foreground-color xterm-color--current)
@@ -546,7 +546,7 @@ Returns new STRING with text properties applied.
 This function will check if `xterm-color-preserve-properties' is
 set to T and only call `xterm-color-filter-real' on substrings
 that do not have text properties applied (passing through the rest
-unmodified). Preserving properties in this fashion is really a hack
+unmodified).  Preserving properties in this fashion is really a hack
 and not very robust as there may be situations where text properties
 are applied on ANSI data, which will mess up the state machine.
 It works fine with and is really meant for eshell though.
@@ -558,7 +558,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
 	     for (_ props substring) in (xterm-color--string-properties string) do
 	     (push (if props substring (xterm-color-filter-real substring))
 		   res)
-	     finally (return (mapconcat 'identity (nreverse res) "")))))
+	     finally return (mapconcat 'identity (nreverse res) ""))))
 
 ;;
 ;; Tests
