@@ -177,6 +177,11 @@
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
+(defcustom xterm-color-filepath-regexps nil
+  "List of regexps matching paths of files to be colorised when loaded."
+  :group 'xterm-color
+  :type '(repeat (regexp :tag "Regexp matching filepath")))
+
 ;;
 ;; Buffer locals, used by state machine
 ;;
@@ -626,6 +631,14 @@ This can be inserted into `comint-preoutput-filter-functions'."
   (cl-loop for color from 232 to 255 do
 	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
 	   finally (insert (xterm-color-filter "[0m\n\n"))))
+
+(defun xterm-color-colorise-file-maybe nil
+  "Colorise the file if it matches one of the regexps in `xterm-color-filepath-regexps'.
+This function should be added to `find-file-hook'."
+  (if (cl-loop for regex in xterm-color-filepath-regexps
+	       if (string-match regex buffer-file-name)
+	       return t)
+      (xterm-color-colorise-buffer (current-buffer))))
 
 (defun xterm-color-test ()
   "Create and display a new buffer that contains ANSI control sequences."
