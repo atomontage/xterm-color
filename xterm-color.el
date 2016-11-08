@@ -637,5 +637,18 @@ This can be inserted into `comint-preoutput-filter-functions'."
   (xterm-color--test-xterm)
   (setq buffer-read-only t))
 
+(defun xterm-color-colorise-buffer (buffer)
+  "Apply `xterm-color-filter' to BUFFER, and replace its contents.
+When called interactively use the current buffer."
+  (interactive (list (current-buffer)))
+  (let ((readonlyp buffer-read-only))
+    (if (and readonlyp
+	     (y-or-n-p "Buffer is read only, continue colourising? "))
+	(read-only-mode -1))
+    (unless buffer-read-only
+	(insert (xterm-color-filter (delete-and-extract-region (point-min) (point-max)))))
+    (read-only-mode (if readonlyp 1 -1))))
+
+
 (provide 'xterm-color)
 ;;; xterm-color.el ends here
