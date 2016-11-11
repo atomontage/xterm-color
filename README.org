@@ -94,7 +94,7 @@ perl tests/xterm-colortest && perl tests/256colors2.pl
 
 #+END_SRC
 
-[[file:xterm-color.png][file:xterm-thumb.png]]
+[[file:xterm-color.png][file:xterm-thumb.png]]  [[file:godwars2.png][file:godwars2-thumb.png]]
 
 * License
 The code comes with a BSD-style license so you can basically do with it
