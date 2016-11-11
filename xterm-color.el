@@ -63,6 +63,10 @@
 ;; (xterm-color-filter "[0m")
 ;;
 ;;
+;; You may also use xterm-color-colorize-buffer, interactively or from elisp,
+;; to colorize an entire buffer.
+;;
+;;
 ;; * You can replace ansi-color.el with xterm-color for all comint buffers:
 ;;
 ;;

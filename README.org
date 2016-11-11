@@ -21,6 +21,9 @@ Example:
 (xterm-color-filter "[0m")
 #+END_SRC
 
+You may also use xterm-color-colorize-buffer, interactively or from elisp,
+to colorize an entire buffer.
+
 If you are inserting into a buffer that has activated font locking, you
 *NO LONGER* need to set /font-lock-unfontify-region-function/ to
 /xterm-color-unfontify-region/ as the latter has been removed.
