@@ -570,10 +570,9 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;;
 
 
-(cl-defun xterm-color-colorize-buffer (buffer)
-  "Apply `xterm-color-filter' to BUFFER, and replace its contents.
-When called interactively use the current buffer."
-  (interactive (list (current-buffer)))
+(cl-defun xterm-color-colorize-buffer ()
+  "Apply `xterm-color-filter' to current buffer, and replace its contents."
+  (interactive)
   (let ((read-only-p buffer-read-only))
     (when read-only-p
       (unless (y-or-n-p "Buffer is read only, continue colorizing? ")
