@@ -1,3 +1,5 @@
+[[http://melpa.org/#/xterm-color][http://melpa.org/packages/xterm-color-badge.svg]]
+
 xterm-color.el is an ANSI control sequence to text-property translator
 
 * Features
