@@ -1,4 +1,6 @@
-[[http://melpa.org/#/xterm-color][http://melpa.org/packages/xterm-color-badge.svg]]
+[[https://opensource.org/licenses/BSD-2-Clause][https://img.shields.io/badge/license-BSD-blue.svg]]
+[[http://melpa.org/#/xterm-color][https://melpa.org/packages/xterm-color-badge.svg]]
+[[http://stable.melpa.org/#/xterm-color][https://stable.melpa.org/packages/xterm-color-badge.svg]]
 
 xterm-color.el is an ANSI control sequence to text-property translator
 
