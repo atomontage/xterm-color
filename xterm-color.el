@@ -3,7 +3,7 @@
 ;; Copyright (C) 2010-2016 xristos@sdf.lonestar.org
 ;; All rights reserved
 ;;
-;; Version: 1.5 - 2016-10-28
+;; Version: 1.6 - 2016-12-28
 ;; Author: xristos@sdf.lonestar.org
 ;; URL: https://github.com/atomontage/xterm-color
 ;; Package-Requires: ((cl-lib "0.5"))
@@ -565,7 +565,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
 	     finally return (mapconcat 'identity (nreverse res) ""))))
 
 ;; This will be removed in 2.0, it's here so as not to break existing configs
-;; for 1.0 -> 1.5 transition.
+;; for 1.0 -> 1.6 transition.
 (defalias 'xterm-color-unfontify-region 'font-lock-default-unfontify-region)
 
 ;;
