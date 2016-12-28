@@ -564,6 +564,9 @@ This can be inserted into `comint-preoutput-filter-functions'."
 		   res)
 	     finally return (mapconcat 'identity (nreverse res) ""))))
 
+;; This will be removed in 2.0, it's here so as not to break existing configs
+;; for 1.0 -> 1.5 transition.
+(defalias 'xterm-color-unfontify-region 'font-lock-default-unfontify-region)
 
 ;;
 ;; Interactive
