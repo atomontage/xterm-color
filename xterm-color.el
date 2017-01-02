@@ -226,6 +226,7 @@ Once that happens, we generate a single text property for the entire string.")
 
 (make-variable-buffer-local 'xterm-color--attributes)
 
+
 (defconst +xterm-color--bright+    1)
 (defconst +xterm-color--italic+    2)
 (defconst +xterm-color--underline+ 4)
@@ -435,7 +436,7 @@ Once that happens, we generate a single text property for the entire string.")
 (defun xterm-color--256 (color)
   (cond ((and (>= color 232)
               (<= color 255))
-         ;; Greyscale
+         ;; Grayscale
          (let ((val (+ 8 (* (- color 232) 10))))
            (format "#%02x%02x%02x"
                    val val val)))
@@ -493,8 +494,6 @@ Once that happens, we generate a single text property for the entire string.")
 Returns new STRING with text properties applied.
 
 This function strips text properties that may be present in STRING."
-  (when (null xterm-color--current)
-    (setq xterm-color--current (make-hash-table)))
   ;; It is *a lot* faster to keep track of propertized strings in a list
   ;; and mapconcat at the end, than using a temporary buffer to insert them.
   (let ((result nil))
@@ -572,6 +571,8 @@ are applied on ANSI data, which will mess up the state machine.
 It works fine with and is really meant for eshell though.
 
 This can be inserted into `comint-preoutput-filter-functions'."
+  (when (null xterm-color--current)
+    (setq xterm-color--current (make-hash-table)))
   (if (not xterm-color-preserve-properties)
       (xterm-color-filter-real string)
     (cl-loop with res = nil
