@@ -403,24 +403,33 @@ Once that happens, we generate a single text property for the entire string.")
 
 
 (defun xterm-color--dispatch-csi (csi)
-    (let* ((len (length csi))
-           (term (aref csi (1- len))))
-      (cond ((= ?m term)
-             ;; SGR
-             (if (= len 1)
-                 (xterm-color--dispatch-SGR '(0))
-               (setq csi (substring csi 0 (1- len)))
-               (xterm-color--dispatch-SGR (mapcar 'string-to-number (split-string csi ";")))))
-            ((= ?J term)
-             ;; Clear screen
-             (xterm-color--message "xterm-color: %s CSI not implemented (clear screen)" csi))
-            ((= ?C term)
-             (let ((num (string-to-number (substring csi 0 (1- len)))))
-               (setq xterm-color--char-buffer
-                     (concat xterm-color--char-buffer
-                             (make-string num 32)))))
-            (t
-             (xterm-color--message "xterm-color: %s CSI not implemented" csi)))))
+  (let* ((len (1- (length csi)))
+         (term (aref csi len)))
+    (cond ((= ?m term)
+           ;; SGR
+           (if (= len 0)
+               (xterm-color--dispatch-SGR '(0))
+             (let ((len (1- len)))              ; Don't need the ?m character
+               (subst-char-in-string 59 ? csi t)
+               (xterm-color--dispatch-SGR
+                ;; The following is somewhat faster than
+                ;; (mapcar 'string-to-number (split-string csi))
+                (cl-loop with idx = 0
+                         while (<= idx len)
+                         for (num . end) = (read-from-string csi idx (1+ len))
+                         do (progn (cl-assert (integerp num))
+                                   (setf idx end))
+                         collect num)))))
+          ((= ?J term)
+           ;; Clear screen
+           (xterm-color--message "xterm-color: %s CSI not implemented (clear screen)" csi))
+          ((= ?C term)
+           (let ((num (string-to-number (substring csi 0 len))))
+             (setq xterm-color--char-buffer
+                   (concat xterm-color--char-buffer
+                           (make-string num 32)))))
+          (t
+           (xterm-color--message "xterm-color: %s CSI not implemented" csi)))))
 
 
 (defun xterm-color--256 (color)
@@ -486,6 +495,8 @@ Returns new STRING with text properties applied.
 This function strips text properties that may be present in STRING."
   (when (null xterm-color--current)
     (setq xterm-color--current (make-hash-table)))
+  ;; It is *a lot* faster to keep track of propertized strings in a list
+  ;; and mapconcat at the end, than using a temporary buffer to insert them.
   (let ((result nil))
     (cl-macrolet ((output (x) `(push ,x result))
                   (update (x place) `(setq ,place (concat ,place (string ,x))))
