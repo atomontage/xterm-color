@@ -557,7 +557,7 @@ This function strips text properties that may be present in STRING."
       (when (eq xterm-color--state :char) (maybe-fontify)))
     (mapconcat 'identity (nreverse result) "")))
 
-
+;;;###autoload
 (defun xterm-color-filter (string)
   "Translate ANSI color sequences in STRING into text properties.
 Returns new STRING with text properties applied.
@@ -590,6 +590,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;;
 
 
+;;;###autoload
 (cl-defun xterm-color-colorize-buffer ()
   "Apply `xterm-color-filter' to current buffer, and replace its contents."
   (interactive)
