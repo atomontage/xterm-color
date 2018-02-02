@@ -1,9 +1,9 @@
 ;;; xterm-color.el --- ANSI & XTERM 256 color support -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2010-2017 xristos@sdf.lonestar.org
+;; Copyright (C) 2010-2018 xristos@sdf.lonestar.org
 ;; All rights reserved
 ;;
-;; Version: 1.6.1 - 2017-1-2
+;; Version: 1.7 - 2018-2-2
 ;; Author: xristos@sdf.lonestar.org
 ;; URL: https://github.com/atomontage/xterm-color
 ;; Package-Requires: ((cl-lib "0.5"))
@@ -41,7 +41,7 @@
 ;;
 ;; * XTERM 256 colors
 ;;
-;; * Works with compilation-mode (experimental)
+;; * Works with compilation-mode
 ;;
 ;; * Works with eshell
 ;;
@@ -67,42 +67,45 @@
 ;; to colorize an entire buffer.
 ;;
 ;;
-;; * You can replace ansi-color.el with xterm-color for all comint buffers:
+;; * You can replace ansi-color.el with xterm-color for all comint buffers,
+;;   but this may create problems with modes that propertize strings
+;;   and feed them through comint-preoutput-filter-functions since xterm-color-filter
+;;   will strip all text properties.
 ;;
+;;   The recommended configuration is to remove ansi-color-process-output from
+;;   comint-output-filter-functions and add xterm-color-filter as the *first*
+;;   hook in the buffer-local comint-preoutput-filter-functions for any comint-based
+;;   mode that you would like it to affect (e.g. shell-mode).
 ;;
-;; + comint install
+;;   An example configuration for shell-mode (M-x shell) is shown below:
 ;;
-;; (progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-;;        (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions)))
+;; (setq comint-output-filter-functions
+;;       (remove 'ansi-color-process-output comint-output-filter-functions))
 ;;
-;; + comint uninstall
+;; (add-hook 'shell-mode-hook
+;;           (lambda () (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
 ;;
-;; (progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-;;        (add-to-list 'comint-output-filter-functions 'ansi-color-process-output))
-;;
-;; If running a shell (M-x shell) also set TERM accordingly (xterm-256color)
-;;
+;; Also set TERM accordingly (xterm-256color)
 ;;
 ;; * You can also use it with eshell (and thus get color output from system ls):
 ;;
-;;
 ;; (require 'eshell)
 ;;
-;; (add-hook 'eshell-mode-hook
+;; (add-hook 'eshell-before-prompt-hook
 ;;           (lambda ()
 ;;             (setq xterm-color-preserve-properties t)))
 ;;
 ;;  (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
 ;;  (setq eshell-output-filter-functions (remove 'eshell-handle-ansi-color eshell-output-filter-functions))
 ;;
-;;  Don't forget to setenv TERM xterm-256color too
+;;  Don't forget to setenv TERM xterm-256color
 ;;
 ;;
 ;; * Compilation buffers
 ;;
 ;;
-;; You may use `compilation-shell-minor-mode' with comint-mode buffers (e.g. M-x shell)
-;; and the comint configuration previously described.
+;; You may use `compilation-shell-minor-mode' with shell-mode buffers
+;; and the configuration previously described.
 ;;
 ;; For standalone compilation-mode buffers, you may use the following
 ;; configuration:
@@ -122,15 +125,12 @@
 ;;                (lambda (proc string)
 ;;                  (funcall 'compilation-filter proc (xterm-color-filter string)))))))
 ;;
-;; Standalone compilation-mode buffer support is experimental, report any
-;; issues that may arise.
-;;
 ;;
 ;;; Test:
 ;;
 ;; M-x xterm-color-test
 ;;
-;; For comint or eshell:
+;; For shell or eshell:
 ;;
 ;; M-x shell || M-x eshell
 ;;
@@ -198,6 +198,11 @@ really meant for and works fine with eshell.")
 
 (make-variable-buffer-local 'xterm-color-preserve-properties)
 
+(defvar xterm-color-ignore-movement nil
+  "If T, ignore CSI sequences that move the cursor.")
+
+(make-variable-buffer-local 'xterm-color-ignore-movement)
+
 (defvar xterm-color--char-buffer ""
   "Buffer with characters that the current ANSI color applies to.
 In order to avoid having per-character text properties, we grow this
@@ -207,10 +212,10 @@ Once that happens, we generate a single text property for the entire string.")
 
 (make-variable-buffer-local 'xterm-color--char-buffer)
 
-(defvar xterm-color--csi-buffer ""
+(defvar xterm-color--CSI-buffer ""
   "Buffer with current ANSI CSI sequence bytes.")
 
-(make-variable-buffer-local 'xterm-color--csi-buffer)
+(make-variable-buffer-local 'xterm-color--CSI-buffer)
 
 (defvar xterm-color--osc-buffer ""
   "Buffer with current ANSI OSC sequence bytes.")
@@ -284,12 +289,12 @@ Once that happens, we generate a single text property for the entire string.")
     ;; XTERM 256 FG color
     ((= 38 elem)
      (setf (gethash 'foreground-color xterm-color--current)
-           (xterm-color--256 (cl-third elems)))
+           (xterm-color-256 (cl-third elems)))
      (setq elems (cl-cdddr elems)))
     ;; XTERM 256 BG color
     ((= 48 elem)
      (setf (gethash 'background-color xterm-color--current)
-           (xterm-color--256 (cl-third elems)))
+           (xterm-color-256 (cl-third elems)))
      (setq elems (cl-cdddr elems)))
     ;; Reset to default FG color
     ((= 39 elem)
@@ -403,37 +408,43 @@ Once that happens, we generate a single text property for the entire string.")
        (setq elems (cdr elems))))))
 
 
-(defun xterm-color--dispatch-csi (csi)
+(defun xterm-color--dispatch-CSI (csi)
   (let* ((len (1- (length csi)))
          (term (aref csi len)))
-    (cond ((= ?m term)
-           ;; SGR
-           (if (= len 0)
-               (xterm-color--dispatch-SGR '(0))
-             (let ((len (1- len)))              ; Don't need the ?m character
-               (subst-char-in-string 59 ? csi t)
-               (xterm-color--dispatch-SGR
-                ;; The following is somewhat faster than
-                ;; (mapcar 'string-to-number (split-string csi))
-                (cl-loop with idx = 0
-                         while (<= idx len)
-                         for (num . end) = (read-from-string csi idx (1+ len))
-                         do (progn (cl-assert (integerp num))
-                                   (setf idx end))
-                         collect num)))))
-          ((= ?J term)
-           ;; Clear screen
-           (xterm-color--message "xterm-color: %s CSI not implemented (clear screen)" csi))
-          ((= ?C term)
-           (let ((num (string-to-number (substring csi 0 len))))
-             (setq xterm-color--char-buffer
-                   (concat xterm-color--char-buffer
-                           (make-string num 32)))))
-          (t
-           (xterm-color--message "xterm-color: %s CSI not implemented" csi)))))
+    (cl-macrolet ((maybe-ignore-CSI
+                   (&rest body)
+                   `(if xterm-color-ignore-movement
+                        (xterm-color--message "xterm-color: ignoring %s CSI since xterm-color-ignore-movement is set" csi)
+                      ,@body)))
+      (cond ((= ?m term)
+             ;; SGR
+             (if (= len 0)
+                 (xterm-color--dispatch-SGR '(0))
+               (let ((len (1- len)))              ; Don't need the ?m character
+                 (subst-char-in-string 59 ? csi t)
+                 (xterm-color--dispatch-SGR
+                  ;; The following is somewhat faster than
+                  ;; (mapcar 'string-to-number (split-string csi))
+                  (cl-loop with idx = 0
+                           while (<= idx len)
+                           for (num . end) = (read-from-string csi idx (1+ len))
+                           do (progn (cl-assert (integerp num))
+                                     (setf idx end))
+                           collect num)))))
+            ((= ?J term)
+             ;; Clear screen
+             (xterm-color--message "xterm-color: %s CSI not implemented (clear screen)" csi))
+            ((= ?C term)
+             (maybe-ignore-CSI
+              (let ((num (string-to-number (substring csi 0 len))))
+                (setq xterm-color--char-buffer
+                      (concat xterm-color--char-buffer
+                              (make-string num 32))))))
+            (t
+             (xterm-color--message "xterm-color: %s CSI not implemented" csi))))))
 
 
-(defun xterm-color--256 (color)
+(defun xterm-color-256 (color)
   (cond ((and (>= color 232)
               (<= color 255))
          ;; Grayscale
@@ -529,12 +540,12 @@ This function strips text properties that may be present in STRING."
 			 (update char xterm-color--char-buffer)
 			 (new-state :char))))
 		 (:ansi-csi
-		  (update char xterm-color--csi-buffer)
+		  (update char xterm-color--CSI-buffer)
 		  (when (and (>= char #x40)
 			     (<= char #x7e))
 		    ;; Dispatch
-		    (xterm-color--dispatch-csi xterm-color--csi-buffer)
-		    (setq xterm-color--csi-buffer "")
+		    (xterm-color--dispatch-CSI xterm-color--CSI-buffer)
+		    (setq xterm-color--CSI-buffer "")
 		    (new-state :char)))
 		 (:ansi-osc
 		  ;; Read entire sequence
@@ -558,6 +569,7 @@ This function strips text properties that may be present in STRING."
     (mapconcat 'identity (nreverse result) "")))
 
 
+;;;###autoload
 (defun xterm-color-filter (string)
   "Translate ANSI color sequences in STRING into text properties.
 Returns new STRING with text properties applied.
@@ -589,7 +601,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;; Interactive
 ;;
 
-
+;;;###autoload
 (cl-defun xterm-color-colorize-buffer ()
   "Apply `xterm-color-filter' to current buffer, and replace its contents."
   (interactive)
@@ -670,6 +682,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
 	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
 	   finally (insert (xterm-color-filter "[0m\n\n"))))
 
+;;;###autoload
 (defun xterm-color-test ()
   "Create and display a new buffer that contains ANSI control sequences."
   (interactive)

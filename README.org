@@ -7,7 +7,7 @@ xterm-color.el is an ANSI control sequence to text-property translator
 * Features
 + Regular ANSI color support
 + XTERM 256 color support
-+ Works with compilation-mode (experimental)
++ Works with compilation-mode
 + Works with eshell
 + Bonus: Faster than ansi-color.el
 
@@ -32,24 +32,32 @@ If you are inserting into a buffer that has activated font locking, you
 *NO LONGER* need to set /font-lock-unfontify-region-function/ to
 /xterm-color-unfontify-region/ as the latter has been removed.
 
-You can replace ansi-color.el with xterm-color for all comint buffers:
+You can replace ansi-color.el with xterm-color for all comint buffers,
+but this may create problems with modes that propertize strings and
+feed them through comint-preoutput-filter-functions since xterm-color-filter
+will strip all text properties.
+
+The recommended configuration is to remove ansi-color-process-output from
+comint-output-filter-functions and add xterm-color-filter as the *first*
+hook in the buffer-local comint-preoutput-filter-functions for any comint-based
+mode that you would like it to affect (e.g. shell-mode).
+
+An example configuration for shell-mode (M-x shell) is shown below:
 
 #+BEGIN_SRC emacs-lisp
-;; comint install
-(progn (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-       (setq comint-output-filter-functions (remove 'ansi-color-process-output comint-output-filter-functions)))
+(setq comint-output-filter-functions
+      (remove 'ansi-color-process-output comint-output-filter-functions))
 
-;; comint uninstall
-(progn (remove-hook 'comint-preoutput-filter-functions 'xterm-color-filter)
-       (add-to-list 'comint-output-filter-functions 'ansi-color-process-output))
+(add-hook 'shell-mode-hook
+          (lambda () (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
 
-;; For M-x shell, also set TERM accordingly (xterm-256color)
+;; Also set TERM accordingly (xterm-256color)
 
 ;; You can also use it with eshell (and thus get color output from system ls):
 
 (require 'eshell)
 
-(add-hook 'eshell-mode-hook
+(add-hook 'eshell-before-prompt-hook
           (lambda ()
             (setq xterm-color-preserve-properties t)))
 
@@ -60,8 +68,8 @@ You can replace ansi-color.el with xterm-color for all comint buffers:
 
 #+END_SRC
 
-You may use `compilation-shell-minor-mode' with comint-mode buffers
-(e.g. M-x shell) and the comint configuration previously described.
+You may use `compilation-shell-minor-mode' with shell-mode buffers
+and the configuration previously described.
 
 For standalone compilation buffers use the following configuration:
 
