@@ -1,14 +1,14 @@
 ;;; xterm-color.el --- ANSI & XTERM 256 color support -*- lexical-binding: t -*-
-;;
+
 ;; Copyright (C) 2010-2018 xristos@sdf.lonestar.org
 ;; All rights reserved
-;;
+
 ;; Version: 1.7 - 2018-2-2
-;; Author: xristos@sdf.lonestar.org
+;; Author: xristos <xristos@sdf.lonestar.org>
 ;; URL: https://github.com/atomontage/xterm-color
 ;; Package-Requires: ((cl-lib "0.5"))
 ;; Keywords: faces
-;;
+
 ;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions
 ;; are met:
@@ -35,7 +35,7 @@
 
 ;;; Commentary:
 ;;
-;; Translates ANSI control sequences into text properties.
+;; Translate ANSI control sequences into text properties.
 ;;
 ;; * Regular ANSI colors
 ;;
@@ -114,18 +114,17 @@
 ;;
 ;; (add-hook 'compilation-start-hook
 ;;           (lambda (proc)
-;;             ;; We need to differentiate between compilation-mode buffers
+;;             ;; Need to differentiate between compilation-mode buffers
 ;;             ;; and running as part of comint (which at this point we assume
 ;;             ;; has been configured separately for xterm-color)
 ;;             (when (eq (process-filter proc) 'compilation-filter)
 ;;               ;; This is a process associated with a compilation-mode buffer.
-;;               ;; We may call `xterm-color-filter' before its own filter function.
+;;               ;; `xterm-color-filter' should be called before its own filter function.
 ;;               (set-process-filter
 ;;                proc
 ;;                (lambda (proc string)
 ;;                  (funcall 'compilation-filter proc (xterm-color-filter string)))))))
-;;
-;;
+
 ;;; Test:
 ;;
 ;; M-x xterm-color-test
@@ -135,23 +134,22 @@
 ;; M-x shell || M-x eshell
 ;;
 ;; perl tests/xterm-colortest && perl tests/256colors2.pl
-;;
-;;
+
 ;;; Code:
 
 (require 'cl-lib)
 
 (defgroup xterm-color nil
-  "Translates ANSI control sequences to text properties."
+  "Translate ANSI control sequences to text properties."
   :prefix "xterm-color-"
   :group 'processes)
 
-;;
-;; CUSTOM
-;;
+;;;
+;;; CUSTOM
+;;;
 
 (defcustom xterm-color-debug nil
-  "Print ANSI state machine debug information in *Messages* if T."
+  "Print ANSI state machine debug information in *Messages* if not NIL."
   :type 'boolean
   :group 'xterm-color)
 
@@ -181,9 +179,9 @@
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
-;;
-;; Buffer locals, used by state machine
-;;
+;;;
+;;; Buffer locals, used by state machine
+;;;
 
 (defvar xterm-color--current nil
   "Hash table with current ANSI color.")
@@ -205,10 +203,10 @@ really meant for and works fine with eshell.")
 
 (defvar xterm-color--char-buffer ""
   "Buffer with characters that the current ANSI color applies to.
-In order to avoid having per-character text properties, we grow this
-buffer dynamically until we encounter an ANSI reset sequence.
+In order to avoid having per-character text properties, this buffer is
+grown dynamically until an ANSI reset sequence is encountered.
 
-Once that happens, we generate a single text property for the entire string.")
+Once that happens, a single text property for the entire string is generated.")
 
 (make-variable-buffer-local 'xterm-color--char-buffer)
 
@@ -240,9 +238,9 @@ Once that happens, we generate a single text property for the entire string.")
 (defconst +xterm-color--frame+     32)
 (defconst +xterm-color--overline+  64)
 
-;;
-;; Functions
-;;
+;;;
+;;; Functions
+;;;
 
 (cl-defun xterm-color--string-properties (string)
   (cl-loop
@@ -258,7 +256,7 @@ Once that happens, we generate a single text property for the entire string.")
        (cl-return-from xterm-color--string-properties (nreverse res))))))
 
 (defun xterm-color--message (format-string &rest args)
-  "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is T."
+  "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is not NIL."
   (when xterm-color-debug
     (let ((message-truncate-lines t))
       (apply 'message format-string args)
@@ -502,11 +500,13 @@ Once that happens, we generate a single text property for the entire string.")
 
 (defun xterm-color-filter-real (string)
   "Translate ANSI color sequences in STRING into text properties.
-Returns new STRING with text properties applied.
+Return new STRING with text properties applied.
 
 This function strips text properties that may be present in STRING."
-  ;; It is *a lot* faster to keep track of propertized strings in a list
+
+  ;; NOTE: It is *a lot* faster to keep track of propertized strings in a list
   ;; and mapconcat at the end, than using a temporary buffer to insert them.
+
   (let ((result nil))
     (cl-macrolet ((output (x) `(push ,x result))
                   (update (x place) `(setq ,place (concat ,place (string ,x))))
@@ -572,7 +572,7 @@ This function strips text properties that may be present in STRING."
 ;;;###autoload
 (defun xterm-color-filter (string)
   "Translate ANSI color sequences in STRING into text properties.
-Returns new STRING with text properties applied.
+Return new STRING with text properties applied.
 
 This function will check if `xterm-color-preserve-properties' is
 set to T and only call `xterm-color-filter-real' on substrings
@@ -597,9 +597,9 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;; for 1.0 -> 1.6 transition.
 (defalias 'xterm-color-unfontify-region 'font-lock-default-unfontify-region)
 
-;;
-;; Interactive
-;;
+;;;
+;;; Interactive
+;;;
 
 ;;;###autoload
 (cl-defun xterm-color-colorize-buffer ()
@@ -615,9 +615,9 @@ This can be inserted into `comint-preoutput-filter-functions'."
     (when read-only-p (read-only-mode 1))))
 
 
-;;
-;; Tests
-;;
+;;;
+;;; Tests
+;;;
 
 (let ((test-attributes
        '((1  . "bright")
