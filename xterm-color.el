@@ -682,16 +682,23 @@ This can be inserted into `comint-preoutput-filter-functions'."
 	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
 	   finally (insert (xterm-color-filter "[0m\n\n"))))
 
+(defmacro xterm-color--bench (path &optional repetitions)
+  `(benchmark-run-compiled ,repetitions
+     (with-temp-buffer
+       (insert-file-contents-literally ,path)
+       (xterm-color-colorize-buffer))))
+
 ;;;###autoload
 (defun xterm-color-test ()
   "Create and display a new buffer that contains ANSI control sequences."
   (interactive)
-  (let* ((name (generate-new-buffer-name "xterm-color-test"))
+  (let* ((name (generate-new-buffer-name "*xterm-color-test*"))
          (buf (get-buffer-create name)))
     (switch-to-buffer buf))
   (xterm-color--test-ansi)
   (xterm-color--test-xterm)
-  (setq buffer-read-only t))
+  (setq buffer-read-only t)
+  (goto-char (point-min)))
 
 
 (provide 'xterm-color)
