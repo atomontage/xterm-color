@@ -228,14 +228,17 @@ Once that happens, a single text property for the entire string is generated.")
 
 (make-variable-buffer-local 'xterm-color--state)
 
-(defvar xterm-color--attributes 0)
+(defvar xterm-color--attributes 0
+  "Bitvector that keeps track of bright, italic, underline, strike-through,
+inverse-color, frame, overline SGR state machine bits.")
 
 (make-variable-buffer-local 'xterm-color--attributes)
 
-(defvar xterm-color--cache nil
-  "Hash table with cached face attributes.")
+(defvar xterm-color--cache-fg (make-hash-table :test 'equal)
+  "Hash table with cached color attributes.")
 
-(make-variable-buffer-local 'xterm-color--cache)
+(defvar xterm-color--cache-bg (make-hash-table :test 'equal)
+  "Hash table with cached color attributes.")
 
 ;;;
 ;;; Constants
@@ -249,16 +252,14 @@ Once that happens, a single text property for the entire string is generated.")
 
 (cl-defun xterm-color--string-properties (string)
   (cl-loop
-   with res = '()
-   with pos = 0
-   do
+   with pos = 0 and result do
    (let ((next-pos (next-property-change pos string)))
      (if next-pos
          (progn
-           (push (list pos (text-properties-at pos string) (substring string pos next-pos)) res)
+           (push (list pos (text-properties-at pos string) (substring string pos next-pos)) result)
            (setq pos next-pos))
-       (push (list pos (text-properties-at pos string) (substring string pos)) res)
-       (cl-return-from xterm-color--string-properties (nreverse res))))))
+       (push (list pos (text-properties-at pos string) (substring string pos)) result)
+       (cl-return-from xterm-color--string-properties (nreverse result))))))
 
 (defun xterm-color--message (format-string &rest args)
   "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is not NIL."
@@ -269,20 +270,20 @@ Once that happens, a single text property for the entire string is generated.")
 
 (defmacro xterm-color--with-constants (&rest body)
   `(cl-symbol-macrolet
-       ((+bright+         1)
-        (+italic+         2)
-        (+underline+      4)
-        (+strike+         8)
-        (+negative+      16)
-        (+frame+         32)
-        (+overline+      64)
-        (+not-bright+    (logand #xff (lognot +bright+)))
-        (+not-italic+    (logand #xff (lognot +italic+)))
-        (+not-underline+ (logand #xff (lognot +underline+)))
-        (+not-strike+    (logand #xff (lognot +strike+)))
-        (+not-negative+  (logand #xff (lognot +negative+)))
-        (+not-frame+     (logand #xff (lognot +frame+)))
-        (+not-overline+  (logand #xff (lognot +overline+))))
+       ((+bright+              1)
+        (+italic+              2)
+        (+underline+           4)
+        (+strike-through+      8)
+        (+negative+           16)
+        (+frame+              32)
+        (+overline+           64)
+        (+not-bright+         (logand #xff (lognot +bright+)))
+        (+not-italic+         (logand #xff (lognot +italic+)))
+        (+not-underline+      (logand #xff (lognot +underline+)))
+        (+not-strike-through+ (logand #xff (lognot +strike-through+)))
+        (+not-negative+       (logand #xff (lognot +negative+)))
+        (+not-frame+          (logand #xff (lognot +frame+)))
+        (+not-overline+       (logand #xff (lognot +overline+))))
      ,@body))
 
 (defun xterm-color--dispatch-SGR (elems)
@@ -353,7 +354,7 @@ Once that happens, a single text property for the entire string is generated.")
      ;; Strike through
      ((= 9 elem)
       (setq xterm-color--attributes
-            (logior xterm-color--attributes +strike+)
+            (logior xterm-color--attributes +strike-through+)
             elems (cdr elems)))
      ;; Normal intensity
      ((= 22 elem)
@@ -378,7 +379,7 @@ Once that happens, a single text property for the entire string is generated.")
      ;; No strike through
      ((= 29 elem)
       (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-strike+)
+            (logand xterm-color--attributes +not-strike-through+)
             elems (cdr elems)))
      ;; Frame
      ((= 51 elem)
@@ -474,74 +475,66 @@ Once that happens, a single text property for the entire string is generated.")
                      (aref +xterm-color--table-256+ blue))))))
 
 (defmacro xterm-color--with-macro-helpers (&rest body)
-  `(let ((state xterm-color--state)
-         result)
-     (xterm-color--with-constants
-      (cl-macrolet
-          ((output (x) `(push ,x result))
-           (update (x place) `(setq ,place (concat ,place (string ,x))))
-           (new-state (s) `(setq state ,s))
-           (has-color? () `(or xterm-color--current-fg
-                               xterm-color--current-bg
-                               (/= xterm-color--attributes 0)))
-           (is-set? (attrib) `(/= (logand ,attrib xterm-color--attributes) 0))
-           (make-property
-            ()
-            `(let (ret)
-               (when (is-set? +italic+)    (push '(:slant italic) ret))
-               (when (is-set? +underline+) (push '(:underline t) ret))
-               (when (is-set? +strike+)    (push '(:strike-through t) ret))
-               (when (is-set? +negative+)  (push '(:inverse-video t) ret))
-               (when (is-set? +overline+)  (push '(:overline t) ret))
-               (when (is-set? +frame+)     (push '(:box t) ret))
-               (when xterm-color--current-fg
-                 (let ((c (if (stringp xterm-color--current-fg)
-                              xterm-color--current-fg
-                            (if (is-set? +bright+)
-                                (aref xterm-color-names-bright xterm-color--current-fg)
-                              (aref xterm-color-names xterm-color--current-fg)))))
-                   (push (or (gethash c xterm-color--cache)
-                             (setf (gethash c xterm-color--cache) `(:foreground ,c)))
-                         ret)))
-               (when xterm-color--current-bg
-                 (let ((c (if (stringp xterm-color--current-bg)
-                              xterm-color--current-bg
-                            (aref xterm-color-names xterm-color--current-bg))))
-                   (push (or (gethash c xterm-color--cache)
-                             (setf (gethash c xterm-color--cache) `(:background ,c)))
-                         ret)))
-               ret))
-           (fontify () `(progn (if (has-color?)
-                                   (output (propertize xterm-color--char-buffer 'xterm-color t
-                                                       (if font-lock-mode 'font-lock-face 'face)
-                                                       (make-property)))
-                                 (output xterm-color--char-buffer))
-                               (setq xterm-color--char-buffer "")))
-           (maybe-fontify () `(when (> (length xterm-color--char-buffer) 0)
-                                (fontify))))
-        ,@body))
-     (setq xterm-color--state state)
-     (mapconcat 'identity (nreverse result) "")))
+  `(xterm-color--with-constants
+    (cl-macrolet
+        ((output (x)       `(push ,x result))
+         (update (x place) `(setq ,place (concat ,place (string ,x))))
+         (new-state (s)    `(setq state ,s))
+         (has-color? ()    `(or xterm-color--current-fg
+                                xterm-color--current-bg
+                                (/= xterm-color--attributes 0)))
+         (is-set? (attrib) `(/= (logand ,attrib xterm-color--attributes) 0))
+         (fg-get (c)       `(gethash ,c xterm-color--cache-fg))
+         (fg-set (c)       `(setf (gethash ,c xterm-color--cache-fg) `(:foreground ,c)))
+         (bg-get (c)       `(gethash ,c xterm-color--cache-bg))
+         (bg-set (c)       `(setf (gethash ,c xterm-color--cache-bg) `(:background ,c)))
+         (make-property () `(let (ret)
+                              (when (is-set? +italic+)         (push '(:slant italic) ret))
+                              (when (is-set? +underline+)      (push '(:underline t) ret))
+                              (when (is-set? +strike-through+) (push '(:strike-through t) ret))
+                              (when (is-set? +negative+)       (push '(:inverse-video t) ret))
+                              (when (is-set? +overline+)       (push '(:overline t) ret))
+                              (when (is-set? +frame+)          (push '(:box t) ret))
+                              (when xterm-color--current-fg
+                                (let ((c (if (stringp xterm-color--current-fg)
+                                             xterm-color--current-fg
+                                           (if (is-set? +bright+)
+                                               (aref xterm-color-names-bright xterm-color--current-fg)
+                                             (aref xterm-color-names xterm-color--current-fg)))))
+                                  (push (or (fg-get c) (fg-set c))
+                                        ret)))
+                              (when xterm-color--current-bg
+                                (let ((c (if (stringp xterm-color--current-bg)
+                                             xterm-color--current-bg
+                                           (aref xterm-color-names xterm-color--current-bg))))
+                                  (push (or (bg-get c) (bg-set c))
+                                        ret)))
+                              ret))
+         (maybe-fontify () '(let ((len (length xterm-color--char-buffer)))
+                              (when (> len 0)
+                                (when (has-color?)
+                                  (add-text-properties
+                                   0 len
+                                   (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-property))
+                                   xterm-color--char-buffer)
+                                  (output xterm-color--char-buffer))
+                                (setq xterm-color--char-buffer "")))))
+      ,@body)))
 
 ;;;###autoload
-(defun xterm-color-filter-real (string)
+(defun xterm-color-filter-strip (string)
   "Translate ANSI color sequences in STRING into text properties.
 Return new STRING with text properties applied.
 
 This function strips text properties that may be present in STRING."
-  (unless xterm-color--cache
-    (setq xterm-color--cache (make-hash-table :test 'equal)))
-
-  ;; NOTE: It is *a lot* faster to keep track of propertized strings in a list
-  ;; and mapconcat at the end, than using a temporary buffer to insert them.
   (xterm-color--with-macro-helpers
    (cl-loop
+    with result and state = xterm-color--state
     for char across string do
     (cl-case state
       (:char
-
        (cond
-        ((= char 27)        ; ESC
+        ((= char 27)                    ; ESC
          (maybe-fontify)
          (new-state :ansi-esc))
         (t
@@ -582,8 +575,9 @@ This function strips text properties that may be present in STRING."
               (setq xterm-color--osc-buffer "")
               (new-state :char))
              (t (new-state :ansi-osc)))))
-    finally (when (eq state :char)
-              (maybe-fontify)))))
+    finally (when (eq state :char) (maybe-fontify))
+    finally (setq xterm-color--state state)
+    finally return (mapconcat 'identity (nreverse result) ""))))
 
 
 ;;;###autoload
@@ -592,7 +586,7 @@ This function strips text properties that may be present in STRING."
 Return new STRING with text properties applied.
 
 This function will check if `xterm-color-preserve-properties' is
-set to T and only call `xterm-color-filter-real' on substrings
+set to T and only call `xterm-color-filter-strip' on substrings
 that do not have text properties applied (passing through the rest
 unmodified).  Preserving properties in this fashion is really a hack
 and not very robust as there may be situations where text properties
@@ -601,12 +595,13 @@ It works fine with and is really meant for eshell though.
 
 This can be inserted into `comint-preoutput-filter-functions'."
   (if (not xterm-color-preserve-properties)
-      (xterm-color-filter-real string)
-    (cl-loop with res = nil
-	     for (_ props substring) in (xterm-color--string-properties string) do
-	     (push (if props substring (xterm-color-filter-real substring))
-		   res)
-	     finally return (mapconcat 'identity (nreverse res) ""))))
+      (xterm-color-filter-strip string)
+    (cl-loop
+     with result
+     for (_ props substring) in (xterm-color--string-properties string) do
+     (push (if props substring (xterm-color-filter-strip substring))
+           result)
+     finally return (mapconcat 'identity (nreverse result) ""))))
 
 ;; This will be removed in 2.0, it's here so as not to break existing configs
 ;; for 1.0 -> 1.6 transition.
