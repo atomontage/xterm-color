@@ -234,11 +234,8 @@ inverse-color, frame, overline SGR state machine bits.")
 
 (make-variable-buffer-local 'xterm-color--attributes)
 
-(defvar xterm-color--cache-fg (make-hash-table :test 'equal)
-  "Hash table with cached color attributes.")
-
-(defvar xterm-color--cache-bg (make-hash-table :test 'equal)
-  "Hash table with cached color attributes.")
+(defvar xterm-color--face-cache (make-hash-table :weakness 'value)
+  "Auto-generated face cache.")
 
 ;;;
 ;;; Constants
@@ -310,13 +307,11 @@ inverse-color, frame, overline SGR state machine bits.")
             elems (cdr elems)))
      ;; XTERM 256 FG color
      ((= 38 elem)
-      (setq xterm-color--current-fg
-            (xterm-color-256 (cl-third elems))
+      (setq xterm-color--current-fg (cl-third elems)
             elems (cl-cdddr elems)))
      ;; XTERM 256 BG color
      ((= 48 elem)
-      (setq xterm-color--current-bg
-            (xterm-color-256 (cl-third elems))
+      (setq xterm-color--current-bg (cl-third elems)
             elems (cl-cdddr elems)))
      ;; Reset to default FG color
      ((= 39 elem)
@@ -477,48 +472,47 @@ inverse-color, frame, overline SGR state machine bits.")
 (defmacro xterm-color--with-macro-helpers (&rest body)
   `(xterm-color--with-constants
     (cl-macrolet
-        ((output (x)       `(push ,x result))
-         (update (x place) `(setq ,place (concat ,place (string ,x))))
-         (new-state (s)    `(setq state ,s))
-         (has-color? ()    `(or xterm-color--current-fg
-                                xterm-color--current-bg
-                                (/= xterm-color--attributes 0)))
-         (is-set? (attrib) `(/= (logand ,attrib xterm-color--attributes) 0))
-         (fg-get (c)       `(gethash ,c xterm-color--cache-fg))
-         (fg-set (c)       `(setf (gethash ,c xterm-color--cache-fg) `(:foreground ,c)))
-         (bg-get (c)       `(gethash ,c xterm-color--cache-bg))
-         (bg-set (c)       `(setf (gethash ,c xterm-color--cache-bg) `(:background ,c)))
-         (make-property () `(let (ret)
-                              (when (is-set? +italic+)         (push '(:slant italic) ret))
-                              (when (is-set? +underline+)      (push '(:underline t) ret))
-                              (when (is-set? +strike-through+) (push '(:strike-through t) ret))
-                              (when (is-set? +negative+)       (push '(:inverse-video t) ret))
-                              (when (is-set? +overline+)       (push '(:overline t) ret))
-                              (when (is-set? +frame+)          (push '(:box t) ret))
-                              (when xterm-color--current-fg
-                                (let ((c (if (stringp xterm-color--current-fg)
-                                             xterm-color--current-fg
-                                           (if (is-set? +bright+)
-                                               (aref xterm-color-names-bright xterm-color--current-fg)
-                                             (aref xterm-color-names xterm-color--current-fg)))))
-                                  (push (or (fg-get c) (fg-set c))
-                                        ret)))
-                              (when xterm-color--current-bg
-                                (let ((c (if (stringp xterm-color--current-bg)
-                                             xterm-color--current-bg
-                                           (aref xterm-color-names xterm-color--current-bg))))
-                                  (push (or (bg-get c) (bg-set c))
-                                        ret)))
-                              ret))
-         (maybe-fontify () '(let ((len (length xterm-color--char-buffer)))
-                              (when (> len 0)
-                                (when (has-color?)
-                                  (add-text-properties
-                                   0 len
-                                   (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-property))
-                                   xterm-color--char-buffer)
-                                  (output xterm-color--char-buffer))
-                                (setq xterm-color--char-buffer "")))))
+        ((output (x)        `(push ,x result))
+         (update (x place)  `(setq ,place (concat ,place (string ,x))))
+         (new-state (s)     `(setq state ,s))
+         (has-color? ()     `(or xterm-color--current-fg
+                                 xterm-color--current-bg
+                                 (/= xterm-color--attributes 0)))
+         (is-set? (attrib)  `(/= (logand ,attrib xterm-color--attributes) 0))
+         (face-cache-get () `(gethash (logior (ash xterm-color--attributes 16)
+                                              (ash (or xterm-color--current-bg 0) 8)
+                                              (or xterm-color--current-fg 0))
+                                      xterm-color--face-cache))
+         (make-face ()      `(or (face-cache-get)
+                                 (let ((f (cl-gensym "xterm-color-face-")) ret)
+                                   (when (is-set? +italic+)         (push 'italic ret) (push :slant ret))
+                                   (when (is-set? +underline+)      (push t ret)  (push :underline ret))
+                                   (when (is-set? +strike-through+) (push t ret) (push :strike-through ret))
+                                   (when (is-set? +negative+)       (push t ret) (push :inverse-video ret))
+                                   (when (is-set? +overline+)       (push t ret) (push :overline ret))
+                                   (when (is-set? +frame+)          (push t ret) (push :box ret ))
+                                   (when xterm-color--current-fg
+                                     (push (xterm-color-256 (if (and (<= xterm-color--current-fg 7)
+                                                                     (is-set? +bright+))
+                                                                (+ xterm-color--current-fg 8)
+                                                              xterm-color--current-fg))
+                                           ret)
+                                     (push :foreground ret))
+                                   (when xterm-color--current-bg
+                                     (push (xterm-color-256 xterm-color--current-bg) ret)
+                                     (push :background ret))
+                                   (push t ret)
+                                   (face-spec-set f (list ret))
+                                   (setf (face-cache-get) f))))
+         (maybe-fontify ()  '(let ((len (length xterm-color--char-buffer)))
+                               (when (> len 0)
+                                 (when (has-color?)
+                                   (add-text-properties
+                                    0 len
+                                    (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-face))
+                                    xterm-color--char-buffer))
+                                 (output xterm-color--char-buffer)
+                                 (setq xterm-color--char-buffer "")))))
       ,@body)))
 
 ;;;###autoload
@@ -529,7 +523,7 @@ Return new STRING with text properties applied.
 This function strips text properties that may be present in STRING."
   (xterm-color--with-macro-helpers
    (cl-loop
-    with result and state = xterm-color--state
+    with state = xterm-color--state and result
     for char across string do
     (cl-case state
       (:char
@@ -629,6 +623,12 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;;; Tests
 ;;;
 
+(defmacro xterm-color--bench (path &optional repetitions)
+  `(benchmark-run-compiled ,repetitions
+     (with-temp-buffer
+       (insert-file-contents-literally ,path)
+       (xterm-color-colorize-buffer))))
+
 (let ((test-attributes
        '((1  . "bright")
          (51 . "frame")
@@ -691,12 +691,6 @@ This can be inserted into `comint-preoutput-filter-functions'."
   (cl-loop for color from 232 to 255 do
 	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
 	   finally (insert (xterm-color-filter "[0m\n\n"))))
-
-(defmacro xterm-color--bench (path &optional repetitions)
-  `(benchmark-run-compiled ,repetitions
-     (with-temp-buffer
-       (insert-file-contents-literally ,path)
-       (xterm-color-colorize-buffer))))
 
 ;;;###autoload
 (defun xterm-color-test ()
