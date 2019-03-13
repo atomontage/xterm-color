@@ -253,7 +253,8 @@ inverse-color, frame, overline SGR state machine bits.")
       (apply 'message format-string args)
       (message nil))))
 
-(defmacro xterm-color--with-constants (&rest body)
+(defmacro xterm-color--with-constant-attributes (&rest body)
+  (declare (indent defun))
   `(cl-symbol-macrolet
        ((+bright+              1)
         (+italic+              2)
@@ -261,141 +262,59 @@ inverse-color, frame, overline SGR state machine bits.")
         (+strike-through+      8)
         (+negative+           16)
         (+frame+              32)
-        (+overline+           64)
-        (+not-bright+         (logand #xff (lognot +bright+)))
-        (+not-italic+         (logand #xff (lognot +italic+)))
-        (+not-underline+      (logand #xff (lognot +underline+)))
-        (+not-strike-through+ (logand #xff (lognot +strike-through+)))
-        (+not-negative+       (logand #xff (lognot +negative+)))
-        (+not-frame+          (logand #xff (lognot +frame+)))
-        (+not-overline+       (logand #xff (lognot +overline+))))
+        (+overline+           64))
      ,@body))
+
+(defmacro xterm-color--make-SGR-dispatch-table (elem SGR &rest body)
+  (declare (indent defun))
+  `(xterm-color--with-constant-attributes
+     (cl-macrolet ((set-fg (c)     `(setq xterm-color--current-fg ,c))
+                   (set-bg (c)     `(setq xterm-color--current-bg ,c))
+                   (set-attr (a)   `(setq xterm-color--attributes
+                                          (logior xterm-color--attributes ,a)))
+                   (clear-attr (a) `(setq xterm-color--attributes
+                                          (logand xterm-color--attributes
+                                                  (logand #xff (lognot ,a)))))
+                   (clear-attrs () `(setq xterm-color--attributes 0)))
+       (cl-loop
+        for ,elem = (cl-first ,SGR)
+        while ,SGR do
+        (cl-case ,elem
+          ,@(cl-loop for plist in body
+                     for match = (plist-get plist :match)
+                     for jump  = (plist-get plist :jump)
+                     collect (append match `((setq ,SGR ,(or jump `(cdr ,SGR))))))
+          (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" ,elem)
+             (setq ,SGR (cdr ,SGR))))))))
 
 (defsubst xterm-color--dispatch-SGR (SGR)
   "Update state machine based on SGR which should be a list of SGR attributes (integers)."
-;  (message "SGR: %s" SGR)
-  (xterm-color--with-constants
-   (cl-loop
-    for elem = (cl-first SGR)
-    while SGR do
-    (cond
-     ;; Reset
-     ((= 0 elem)
-      (setq xterm-color--current-fg nil
-            xterm-color--current-bg nil
-            xterm-color--attributes 0
-            SGR (cdr SGR)))
-     ;; ANSI FG color
-     ((and (>= elem 30)
-           (<= elem 37))
-      (setq xterm-color--current-fg (- elem 30)
-            SGR (cdr SGR)))
-     ;; ANSI BG color
-     ((and (>= elem 40)
-           (<= elem 47))
-      (setq xterm-color--current-bg (- elem 40)
-            SGR (cdr SGR)))
-     ;; XTERM 256 FG color
-     ((= 38 elem)
-      (setq xterm-color--current-fg (cl-third SGR)
-            SGR (cl-cdddr SGR)))
-     ;; XTERM 256 BG color
-     ((= 48 elem)
-      (setq xterm-color--current-bg (cl-third SGR)
-            SGR (cl-cdddr SGR)))
-     ;; Reset to default FG color
-     ((= 39 elem)
-      (setq xterm-color--current-fg nil
-            SGR (cdr SGR)))
-     ;; Reset to default BG color
-     ((= 49 elem)
-      (setq xterm-color--current-bg nil
-            SGR (cdr SGR)))
-     ;; Bright color
-     ((= 1 elem)
-      (setq xterm-color--attributes
-            (logior xterm-color--attributes +bright+)
-            SGR (cdr SGR)))
-     ;; Faint color, emulated as normal intensity
-     ((= 2 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-bright+)
-            SGR (cdr SGR)))
-     ;; Italic
-     ((= 3 elem)
-      (setq xterm-color--attributes
-            (logior xterm-color--attributes +italic+)
-            SGR (cdr SGR)))
-     ;; Underline
-     ((= 4 elem)
-      (setq xterm-color--attributes
-            (logior xterm-color--attributes +underline+)
-            SGR (cdr SGR)))
-     ;; Negative
-     ((= 7 elem)
-      (setq xterm-color--attributes
-            (logior xterm-color--attributes +negative+)
-            SGR (cdr SGR)))
-     ;; Strike through
-     ((= 9 elem)
-      (setq xterm-color--attributes
-            (logior xterm-color--attributes +strike-through+)
-            SGR (cdr SGR)))
-     ;; Normal intensity
-     ((= 22 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-bright+)
-            SGR (cdr SGR)))
-     ;; No italic
-     ((= 23 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-italic+)
-            SGR (cdr SGR)))
-     ;; No underline
-     ((= 24 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-underline+)
-            SGR (cdr SGR)))
-     ;; No negative
-     ((= 27 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-negative+)
-            SGR (cdr SGR)))
-     ;; No strike through
-     ((= 29 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-strike-through+)
-            SGR (cdr SGR)))
-     ;; Frame
-     ((= 51 elem)
-      (setq xterm-color--attributes
-            (logior xterm-color--attributes +frame+)
-            SGR (cdr SGR)))
-     ;; Overline
-     ((= 53 elem)
-      (setq xterm-color--attributes
-            (logior xterm-color--attributes +overline+)
-            SGR (cdr SGR)))
-     ;; No frame
-     ((= 54 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-frame+)
-            SGR (cdr SGR)))
-     ;; No overline
-     ((= 55 elem)
-      (setq xterm-color--attributes
-            (logand xterm-color--attributes +not-overline+)
-            SGR (cdr SGR)))
-     ;; AIXTERM hi-intensity FG color
-     ((and (>= elem 90)
-           (<= elem 97))
-      (setq xterm-color--current-fg (- elem 90)
-            xterm-color--attributes
-            (logior xterm-color--attributes +bright+)
-            SGR (cdr SGR)))
-     ;; Fallback
-     (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" elem)
-        (setq SGR (cdr SGR)))))))
+  (xterm-color--make-SGR-dispatch-table elem SGR
+    (:match (0 (set-fg nil) (set-bg nil) (clear-attrs)))         ; RESET everything
+    (:match ((30 31 32 33 34 35 36 37) (set-fg (- elem 30))))    ; ANSI FG color
+    (:match ((40 41 42 43 44 45 46 47) (set-bg (- elem 40))))    ; ANSI BG color
+    (:match (38 (set-fg (cl-third SGR))) :jump (cl-cdddr SGR))   ; XTERM 256 FG color
+    (:match (48 (set-bg (cl-third SGR))) :jump (cl-cdddr SGR))   ; XTERM 256 BG color
+    (:match (39 (set-fg nil)))
+    (:match (49 (set-bg nil)))
+    (:match (1 (set-attr +bright+)))
+    (:match (2 (clear-attr +bright+)))
+    (:match (3 (set-attr +italic+)))
+    (:match (4 (set-attr +underline+)))
+    (:match (7 (set-attr +negative+)))
+    (:match (9 (set-attr +strike-through+)))
+    (:match (22 (clear-attr +bright+)))
+    (:match (23 (clear-attr +italic+)))
+    (:match (24 (clear-attr +underline+)))
+    (:match (27 (clear-attr +negative+)))
+    (:match (29 (clear-attr +strike-through+)))
+    (:match (51 (set-attr +frame+)))
+    (:match (53 (set-attr +overline+)))
+    (:match (54 (clear-attr +frame+)))
+    (:match (55 (clear-attr +overline+)))
+    (:match ((90 91 92 93 94 95 96 97)                           ; AIXTERM hi-intensity FG
+             (set-fg (- elem 90))
+             (set-attr +bright+)))))
 
 (defsubst xterm-color--SGR-params (list)
   (cl-loop
@@ -431,7 +350,7 @@ The parameters are taken from `xterm-color--CSI-list'."
 
 
 (defmacro xterm-color--with-macro-helpers (&rest body)
-  `(xterm-color--with-constants
+  `(xterm-color--with-constant-attributes
     (cl-macrolet
         ((output (x)          `(push ,x result))
          (update-char-list () `(push char xterm-color--char-list))
@@ -446,27 +365,25 @@ The parameters are taken from `xterm-color--CSI-list'."
                                                 (ash (or xterm-color--current-bg 0) 8)
                                                 (or xterm-color--current-fg 0))
                                         xterm-color--face-cache))
+         (face-add (k v)      `(setq plistf (plist-put plistf ,k ,v)))
          (make-face ()        `(or (face-cache-get)
-                                   (let ((f (cl-gensym "xterm-color-face-")) ret)
-                                     (when (is-set? +italic+)         (push 'italic ret) (push :slant ret))
-                                     (when (is-set? +underline+)      (push t ret)  (push :underline ret))
-                                     (when (is-set? +strike-through+) (push t ret) (push :strike-through ret))
-                                     (when (is-set? +negative+)       (push t ret) (push :inverse-video ret))
-                                     (when (is-set? +overline+)       (push t ret) (push :overline ret))
-                                     (when (is-set? +frame+)          (push t ret) (push :box ret ))
+                                   (let (plistf)
+                                     (when (is-set? +italic+)         (face-add :slant 'italic))
+                                     (when (is-set? +underline+)      (face-add :underline t))
+                                     (when (is-set? +strike-through+) (face-add :strike-through t))
+                                     (when (is-set? +negative+)       (face-add :inverse-video t))
+                                     (when (is-set? +overline+)       (face-add :overline t))
+                                     (when (is-set? +frame+)          (face-add :box t))
                                      (when xterm-color--current-fg
-                                       (push (xterm-color-256 (if (and (<= xterm-color--current-fg 7)
-                                                                       (is-set? +bright+))
-                                                                  (+ xterm-color--current-fg 8)
-                                                                xterm-color--current-fg))
-                                             ret)
-                                       (push :foreground ret))
+                                       (face-add :foreground
+                                                 (xterm-color-256
+                                                  (if (and (<= xterm-color--current-fg 7)
+                                                           (is-set? +bright+))
+                                                      (+ xterm-color--current-fg 8)
+                                                    xterm-color--current-fg))))
                                      (when xterm-color--current-bg
-                                       (push (xterm-color-256 xterm-color--current-bg) ret)
-                                       (push :background ret))
-                                     (push t ret)
-                                     (face-spec-set f (list ret))
-                                     (setf (face-cache-get) f))))
+                                       (face-add :background (xterm-color-256 xterm-color--current-bg)))
+                                     (setf (face-cache-get) plistf))))
          (maybe-fontify ()    '(when xterm-color--char-list
                                  (let ((s (concat (nreverse xterm-color--char-list))))
                                    (when (has-color?)
