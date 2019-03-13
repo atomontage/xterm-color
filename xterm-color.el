@@ -366,8 +366,10 @@ using other functions, it is possible to skip elements."
     (:match (54) (set-a! +frame+))
     (:match (55) (set-a! +overline+))
     (:match ((<= 90 elem 97))                           ; AIXTERM hi-intensity FG
-            (set-f! (- elem 90))
-            (set-a! +bright+))))
+            ;; Rather than setting the bright attribute, which would be a bug,
+            ;; rescale the color to fall within the range 8-15 which
+            ;; xterm-color-256 will map to xterm-color-names-bright.
+            (set-f! (- elem 82)))))
 
 (defsubst xterm-color--SGR-attributes (list)
   "Convert LIFO list of SGR characters to FIFO list of SGR attributes (integers).
@@ -638,7 +640,13 @@ This can be inserted into `comint-preoutput-filter-functions'."
     (insert "* ANSI attributes (blue background)\n\n")
     (cl-loop for (attrib . name) in test-attributes do
 	     (insert (xterm-color-filter (format "[0;44;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-	     finally (insert "\n"))))
+	     finally (insert "\n"))
+
+    ;; Various test cases
+    (insert "* Various\n\n")
+    (insert (xterm-color-filter "Default [34;1mBright blue[39m Reset-fg-color [34mBlue (should be bright)[0m\t --[ Reseting FG color should not affect other SGR bits ]\n"))
+    (insert (xterm-color-filter "Default [94mBright blue[34m Switch-to-blue (should be normal intensity)[0m\t --[ AIXTERM bright color should not set bright SGR bit ]\n"))
+    (insert "\n")))
 
 (defun xterm-color--test-xterm ()
   ;; Normal ANSI colors mapped to XTERM
