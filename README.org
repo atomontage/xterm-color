@@ -12,21 +12,23 @@ xterm-color.el is an ANSI control sequence to text-property translator
 + Bonus: Faster than ansi-color.el
 
 * Usage 
-Call xterm-color-filter to propertize strings that you can then insert into
+Interactively or from Emacs Lisp, call xterm-color-colorize-buffer to colorize an entire buffer.
+
+In Emacs Lisp code call xterm-color-filter to propertize strings that you can then insert into
 a buffer. All state is kept in buffer-local variables which means that
 control sequences can span /xterm-color-filter/ call boundaries.
 
 Example:
 
 #+BEGIN_SRC emacs-lisp
-(xterm-color-filter "[0;1;3;4")
-(xterm-color-filter ";35")
-(xterm-color-filter ";mThis is only a test")
-(xterm-color-filter "[0m")
+(let ((buffer (generate-new-buffer "*xterm-color-test*")))
+  (with-current-buffer buffer
+    (insert (xterm-color-filter "[0;1;3;4"))
+    (insert (xterm-color-filter ";35"))
+    (insert (xterm-color-filter ";51mThis is only a test"))
+    (insert (xterm-color-filter "[0m")))
+  (switch-to-buffer buffer))
 #+END_SRC
-
-You may also use xterm-color-colorize-buffer, interactively or from elisp,
-to colorize an entire buffer.
 
 If you are inserting into a buffer that has activated font locking, you
 *NO LONGER* need to set /font-lock-unfontify-region-function/ to
