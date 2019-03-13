@@ -1,9 +1,9 @@
 ;;; xterm-color.el --- ANSI & XTERM 256 color support -*- lexical-binding: t -*-
 
-;; Copyright (C) 2010-2018 xristos@sdf.lonestar.org
+;; Copyright (C) 2010-2019 xristos@sdf.lonestar.org
 ;; All rights reserved
 
-;; Version: 1.7 - 2018-2-2
+;; Version: 1.8 - 2019-03-01
 ;; Author: xristos <xristos@sdf.lonestar.org>
 ;; URL: https://github.com/atomontage/xterm-color
 ;; Package-Requires: ((cl-lib "0.5"))
@@ -51,20 +51,22 @@
 ;;
 ;;; Usage:
 ;;
-;; Call xterm-color-filter to propertize strings that you can then insert into
-;; a buffer. All state is kept in buffer-local variables which means that
-;; control sequences can span xterm-color-filter call boundaries.
+;; Interactively or from Emacs Lisp call xterm-color-colorize-buffer
+;; to colorize an entire buffer.
+;;
+;; In Emacs Lisp, call xterm-color-filter to propertize strings that you can
+;; then insert into a buffer. All state is kept in buffer-local variables
+;; which means that control sequences can span xterm-color-filter call boundaries.
 ;;
 ;; Example:
 ;;
-;; (xterm-color-filter "[0;1;3;4")
-;; (xterm-color-filter ";35")
-;; (xterm-color-filter ";mThis is only a test")
-;; (xterm-color-filter "[0m")
-;;
-;;
-;; You may also use xterm-color-colorize-buffer, interactively or from elisp,
-;; to colorize an entire buffer.
+;; (let ((buffer (generate-new-buffer "*xterm-color-test*")))
+;;   (with-current-buffer buffer
+;;     (insert (xterm-color-filter "[0;1;3;4"))
+;;     (insert (xterm-color-filter ";35"))
+;;     (insert (xterm-color-filter ";51mThis is only a test"))
+;;     (insert (xterm-color-filter "[0m")))
+;;   (switch-to-buffer buffer))
 ;;
 ;;
 ;; * You can replace ansi-color.el with xterm-color for all comint buffers,
@@ -144,9 +146,11 @@
   :prefix "xterm-color-"
   :group 'processes)
 
+
 ;;;
 ;;; CUSTOM
 ;;;
+
 
 (defcustom xterm-color-debug nil
   "Print ANSI state machine debug information in *Messages* if not NIL."
@@ -223,7 +227,7 @@ inverse-color, frame, overline SGR state machine bits.")
 (make-variable-buffer-local 'xterm-color--attributes)
 
 (defvar xterm-color--face-cache (make-hash-table :weakness 'value)
-  "Cache for auto-generated faces.")
+  "Cache for auto-generated face attributes.")
 
 ;;;
 ;;; Constants
@@ -253,70 +257,134 @@ inverse-color, frame, overline SGR state machine bits.")
       (apply 'message format-string args)
       (message nil))))
 
-(defmacro xterm-color--with-constant-attributes (&rest body)
+
+;;;
+;;; SGR state machine
+;;;
+
+
+(cl-defmacro xterm-color--with-SGR-constants (&body body)
   (declare (indent defun))
   `(cl-symbol-macrolet
-       ((+bright+              1)
-        (+italic+              2)
-        (+underline+           4)
-        (+strike-through+      8)
-        (+negative+           16)
-        (+frame+              32)
-        (+overline+           64))
+       ((+bright+           1)
+        (+italic+           2)
+        (+underline+        4)
+        (+strike-through+   8)
+        (+negative+        16)
+        (+frame+           32)
+        (+overline+        64))
      ,@body))
 
-(defmacro xterm-color--make-SGR-dispatch-table (elem SGR &rest body)
+(cl-defmacro xterm-color--create-SGR-table ((attrib SGR-list) &body body)
+  "Create an iteration/dispatch table based on provided rules that match SGR attributes.
+For each attribute in SGR-LIST, check to see if it matches a rule in BODY. If so,
+evaluate the rule body.
+
+ATTRIB should be a symbol that will be bound to SGR-LIST attributes in BODY.
+SGR-LIST should be a list of SGR attributes (integers) in LIFO order.
+BODY should contain rules with each rule being a list of form:
+
+ (:match (condition &optional skip) rule-body-form..)
+
+CONDITION should be a Lisp form which will be evaluated as part of a COND
+condition clause. If it is an atom, it will be rewritten to (= CONDITION ATTRIB).
+Otherwise it will be used as is. As per COND statement, if CONDITION evaluates
+to T, rule body forms will be evaluated as part of the body of the COND clause.
+If SKIP is given, it should be a function that will be used to iterate over SGR-LIST,
+by returning a list that the next iteration will use as SGR-LIST. If not given, CDR will
+be used, meaning the iteration will go down the SGR-LIST one element at a time. By
+using other functions, it is possible to skip elements."
   (declare (indent defun))
-  `(xterm-color--with-constant-attributes
-     (cl-macrolet ((set-fg (c)     `(setq xterm-color--current-fg ,c))
-                   (set-bg (c)     `(setq xterm-color--current-bg ,c))
-                   (set-attr (a)   `(setq xterm-color--attributes
-                                          (logior xterm-color--attributes ,a)))
-                   (clear-attr (a) `(setq xterm-color--attributes
-                                          (logand xterm-color--attributes
-                                                  (logand #xff (lognot ,a)))))
-                   (clear-attrs () `(setq xterm-color--attributes 0)))
+  `(xterm-color--with-SGR-constants
+     (cl-macrolet
+         ;; The following macros can be used in the match rule bodies
+         ((set-a! (attr &key clear)
+                  (if clear
+                      `(setq xterm-color--attributes
+                             (logand xterm-color--attributes
+                                     (logand #xff (lognot ,attr))))
+                    `(setq xterm-color--attributes
+                           (logior xterm-color--attributes ,attr))))
+          (set-f! (fg-color) `(setq xterm-color--current-fg ,fg-color))
+          (set-b! (bg-color) `(setq xterm-color--current-bg ,bg-color))
+          (reset! ()         `(setq xterm-color--current-fg nil
+                                    xterm-color--current-bg nil
+                                    xterm-color--attributes 0)))
        (cl-loop
-        for ,elem = (cl-first ,SGR)
-        while ,SGR do
-        (cl-case ,elem
-          ,@(cl-loop for plist in body
-                     for match = (plist-get plist :match)
-                     for jump  = (plist-get plist :jump)
-                     collect (append match `((setq ,SGR ,(or jump `(cdr ,SGR))))))
-          (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" ,elem)
-             (setq ,SGR (cdr ,SGR))))))))
+        for ,attrib = (cl-first ,SGR-list)
+        while ,SGR-list do
+        (cond
+         ,@(cl-loop
+            for skip = nil
+            for (tag (c . rest) . rule-body) in body
+            when (not (eq tag :match)) do
+            (error "Rule (%s (%s..)..) does not start with :match" tag c)
+            when rest do
+            (setq skip (car rest))
+            (and (cdr rest) (error "Rule (%s (%s..)..) has malformed arguments: %s" tag c rest))
+            ;; Condition part of the COND clause
+            collect `(,(if (atom c) `(= ,c ,attrib) c)
+                      ;; Body of the COND clause
+                      ,@rule-body
+                      ;; Last expression of the body of the COND clause
+                      ;; that determines how many SGR attributes will be
+                      ;; skipped. If a skip argument is provided to the
+                      ;; match rule, it will be funcalled with SGR-list
+                      ;; as the argument. Otherwise CDR will be used which
+                      ;; will skip to the next SGR attribute.
+                      (setq ,SGR-list ,(if skip
+                                           `(funcall ,skip ,SGR-list)
+                                         `(cdr ,SGR-list)))))
+         (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" ,attrib)))))))
 
-(defsubst xterm-color--dispatch-SGR (SGR)
-  "Update state machine based on SGR which should be a list of SGR attributes (integers)."
-  (xterm-color--make-SGR-dispatch-table elem SGR
-    (:match (0 (set-fg nil) (set-bg nil) (clear-attrs)))         ; RESET everything
-    (:match ((30 31 32 33 34 35 36 37) (set-fg (- elem 30))))    ; ANSI FG color
-    (:match ((40 41 42 43 44 45 46 47) (set-bg (- elem 40))))    ; ANSI BG color
-    (:match (38 (set-fg (cl-third SGR))) :jump (cl-cdddr SGR))   ; XTERM 256 FG color
-    (:match (48 (set-bg (cl-third SGR))) :jump (cl-cdddr SGR))   ; XTERM 256 BG color
-    (:match (39 (set-fg nil)))
-    (:match (49 (set-bg nil)))
-    (:match (1 (set-attr +bright+)))
-    (:match (2 (clear-attr +bright+)))
-    (:match (3 (set-attr +italic+)))
-    (:match (4 (set-attr +underline+)))
-    (:match (7 (set-attr +negative+)))
-    (:match (9 (set-attr +strike-through+)))
-    (:match (22 (clear-attr +bright+)))
-    (:match (23 (clear-attr +italic+)))
-    (:match (24 (clear-attr +underline+)))
-    (:match (27 (clear-attr +negative+)))
-    (:match (29 (clear-attr +strike-through+)))
-    (:match (51 (set-attr +frame+)))
-    (:match (53 (set-attr +overline+)))
-    (:match (54 (clear-attr +frame+)))
-    (:match (55 (clear-attr +overline+)))
-    (:match ((90 91 92 93 94 95 96 97)                           ; AIXTERM hi-intensity FG
-             (set-fg (- elem 90))
-             (set-attr +bright+)))))
 
-(defsubst xterm-color--SGR-params (list)
+(defsubst xterm-color--dispatch-SGR (SGR-list)
+  "Update state machine based on SGR-LIST which should be a list of SGR attributes (integers)."
+  (xterm-color--create-SGR-table (elem SGR-list)
+    (:match (0)  (reset!))                             ; RESET everything
+    (:match ((<= 30 elem 37)) (set-f! (- elem 30)))     ; ANSI FG color
+    (:match ((<= 40 elem 47)) (set-b! (- elem 40)))     ; ANSI BG color
+    (:match (39) (set-f! nil))                         ; RESET FG color
+    (:match (49) (set-b! nil))                         ; RESET BG color
+    (:match (1)  (set-a! +bright+))
+    (:match (2)  (set-a! +bright+ :clear t))
+    (:match (3)  (set-a! +italic+))
+    (:match (4)  (set-a! +underline+))
+    (:match (7)  (set-a! +negative+))
+    (:match (9)  (set-a! +strike-through+))
+    (:match (22) (set-a! +bright+ :clear t))
+    (:match (23) (set-a! +italic+ :clear t))
+    (:match (24) (set-a! +underline+ :clear t))
+    (:match (27) (set-a! +negative+ :clear t))
+    (:match (29) (set-a! +strike-through+ :clear t))
+    (:match (38 'cl-cdddr)                             ; XTERM 256 FG color
+            (set-f! (cl-third SGR-list)))
+    (:match (48 'cl-cdddr)                             ; XTERM 256 BG color
+            (set-b! (cl-third SGR-list)))
+    (:match (51) (set-a! +frame+))
+    (:match (53) (set-a! +overline+))
+    (:match (54) (set-a! +frame+))
+    (:match (55) (set-a! +overline+))
+    (:match ((<= 90 elem 97))                           ; AIXTERM hi-intensity FG
+            (set-f! (- elem 90))
+            (set-a! +bright+))))
+
+(defsubst xterm-color--SGR-attributes (list)
+  "Convert LIFO list of SGR characters to FIFO list of SGR attributes (integers).
+Characters should be in the ASCII set 0-9 (decimal 48 to 57) and are converted
+to integer digits by subtracting 48 from each character. E.g. Character 48 will
+be converted to integer digit 0, character 49 to integer digit 1 and so on.
+Character 59 (;) is not converted but signifies that all accumulated integer
+digits should be reversed and combined into a single integer (SGR attribute).
+
+Examples:
+
+Given (48) return (0)
+Given (59) return (0)
+Given (48 49 50) return (210)
+Given (48 49 50 59 50 50 59 48 49) return (10 22 210)
+
+Returns FIFO list of SGR attributes."
   (cl-loop
    with mul = 1 and num = 0 and ret
    for c    = (car list) while c do
@@ -330,27 +398,34 @@ inverse-color, frame, overline SGR state machine bits.")
    (setq list (cdr list))
    finally return (push num ret)))
 
+
+;;;
+;;; CSI state machine
+;;;
+
+
 (defsubst xterm-color--dispatch-CSI ()
   "Update state machine based on CSI parameters collected so far.
-The parameters are taken from `xterm-color--CSI-list'."
+The parameters are taken from `xterm-color--CSI-list' which stores them
+in LIFO order."
   (let* ((csi xterm-color--CSI-list)
-         (term (car csi))
-         (params (cdr csi)))
+         (term (car csi))                              ; final parameter, terminator
+         (params (cdr csi)))                           ; rest of parameters, LIFO order
     (setq xterm-color--CSI-list nil)
     (cond ((= ?m term)
            ;; SGR
            (xterm-color--dispatch-SGR
             (if (null params)
                 '(0)
-              (xterm-color--SGR-params params))))
+              (xterm-color--SGR-attributes params))))
           (t
            (xterm-color--message
             "xterm-color: %s CSI %s not implemented"
             csi (if (= ?J term) "(clear screen)" ""))))))
 
-
-(defmacro xterm-color--with-macro-helpers (&rest body)
-  `(xterm-color--with-constant-attributes
+(defmacro xterm-color--with-ANSI-macro-helpers (&rest body)
+  (declare (indent defun))
+  `(xterm-color--with-SGR-constants
     (cl-macrolet
         ((output (x)          `(push ,x result))
          (update-char-list () `(push char xterm-color--char-list))
@@ -395,9 +470,11 @@ The parameters are taken from `xterm-color--CSI-list'."
                                  (setq xterm-color--char-list nil))))
       ,@body)))
 
+
 ;;;
 ;;; Exports
 ;;;
+
 
 ;;;###autoload
 (defun xterm-color-filter-strip (string)
@@ -405,49 +482,49 @@ The parameters are taken from `xterm-color--CSI-list'."
 Return new STRING with text properties applied.
 
 This function strips text properties that may be present in STRING."
-  (xterm-color--with-macro-helpers
-   (cl-loop
-    with state = xterm-color--state and result
-    for char across string do
-    (cl-case state
-      (:char
-       (cond
-        ((= char 27)                    ; ESC
-         (maybe-fontify)
-         (new-state :ansi-esc))
-        (t
-         (if (has-color?)
-             (update-char-list)
-           (output (string char))))))
-      (:ansi-esc
-       (cond ((= char ?\[)
-              (new-state :ansi-csi))
-             ((= char ?\])
-              (new-state :ansi-osc))
-             (t
+  (xterm-color--with-ANSI-macro-helpers
+    (cl-loop
+     with state = xterm-color--state and result
+     for char across string do
+     (cl-case state
+       (:char
+        (cond
+         ((= char 27)                    ; ESC
+          (maybe-fontify)
+          (new-state :ansi-esc))
+         (t
+          (if (has-color?)
               (update-char-list)
-              (new-state :char))))
-      (:ansi-csi
-       (update-CSI-list)
-       (when (and (>= char #x40)
-                  (<= char #x7e))
-         (xterm-color--dispatch-CSI)
-         (new-state :char)))
-      (:ansi-osc
-       ;; OSC sequences are skipped
-       (cond ((= char 7)
-              (new-state :char))
-             ((= char 27)
-              ;; ESC
-              (new-state :ansi-osc-esc))))
-      (:ansi-osc-esc
-       (cond ((= char ?\\)
-              (new-state :char))
-             (t (new-state :ansi-osc)))))
-    finally return
-    (progn (when (eq state :char) (maybe-fontify))
-           (setq xterm-color--state state)
-           (mapconcat 'identity (nreverse result) "")))))
+            (output (string char))))))
+       (:ansi-esc
+        (cond ((= char ?\[)
+               (new-state :ansi-csi))
+              ((= char ?\])
+               (new-state :ansi-osc))
+              (t
+               (update-char-list)
+               (new-state :char))))
+       (:ansi-csi
+        (update-CSI-list)
+        (when (and (>= char #x40)
+                   (<= char #x7e))
+          (xterm-color--dispatch-CSI)
+          (new-state :char)))
+       (:ansi-osc
+        ;; OSC sequences are skipped
+        (cond ((= char 7)
+               (new-state :char))
+              ((= char 27)
+               ;; ESC
+               (new-state :ansi-osc-esc))))
+       (:ansi-osc-esc
+        (cond ((= char ?\\)
+               (new-state :char))
+              (t (new-state :ansi-osc)))))
+     finally return
+     (progn (when (eq state :char) (maybe-fontify))
+            (setq xterm-color--state state)
+            (mapconcat 'identity (nreverse result) "")))))
 
 ;;;###autoload
 (defun xterm-color-filter (string)
@@ -498,9 +575,11 @@ This can be inserted into `comint-preoutput-filter-functions'."
                      (aref +xterm-color--table-256+ green)
                      (aref +xterm-color--table-256+ blue))))))
 
+
 ;;;
 ;;; Interactive
 ;;;
+
 
 ;;;###autoload
 (cl-defun xterm-color-colorize-buffer ()
@@ -519,6 +598,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;;;
 ;;; Tests
 ;;;
+
 
 (defmacro xterm-color--bench (path &optional repetitions)
   `(benchmark-run-compiled ,repetitions
