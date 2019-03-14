@@ -226,8 +226,10 @@ inverse-color, frame, overline SGR state machine bits.")
 
 (make-variable-buffer-local 'xterm-color--attributes)
 
-(defvar xterm-color--face-cache (make-hash-table :weakness 'value)
+(defvar xterm-color--face-cache nil
   "Cache for auto-generated face attributes.")
+
+(make-variable-buffer-local 'xterm-color--face-cache)
 
 ;;;
 ;;; Constants
@@ -335,7 +337,8 @@ using other functions, it is possible to skip elements."
                       (setq ,SGR-list ,(if skip
                                            `(funcall ,skip ,SGR-list)
                                          `(cdr ,SGR-list)))))
-         (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" ,attrib)))))))
+         (t (xterm-color--message "xterm-color: not implemented SGR attribute %s" ,attrib)
+            (setq ,SGR-list (cdr ,SGR-list))))))))
 
 
 (defsubst xterm-color--dispatch-SGR (SGR-list)
@@ -484,6 +487,8 @@ in LIFO order."
 Return new STRING with text properties applied.
 
 This function strips text properties that may be present in STRING."
+  (or xterm-color--face-cache
+      (setq xterm-color--face-cache (make-hash-table :weakness 'value)))
   (xterm-color--with-ANSI-macro-helpers
     (cl-loop
      with state = xterm-color--state and result
@@ -595,6 +600,20 @@ This can be inserted into `comint-preoutput-filter-functions'."
     (insert (xterm-color-filter (delete-and-extract-region (point-min) (point-max))))
     (goto-char (point-min))
     (when read-only-p (read-only-mode 1))))
+
+;;;###autoload
+(defun xterm-color-clear-cache ()
+  "Clear xterm color face attribute cache.
+You may want to call this if you change `xterm-color-names' or
+`xterm-color-names-bright' at runtime and you want to see the changes
+take place in a pre-existing buffer that has had xterm-color initialized.
+
+Since the cache is buffer-local and created on-demand when needed, this has no
+effect when called from a buffer that does not have a cache."
+  (interactive)
+  (and xterm-color--face-cache
+       (clrhash xterm-color--face-cache)
+       (message "Cleared xterm-color face attribute cache")))
 
 
 ;;;
