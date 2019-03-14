@@ -41,6 +41,12 @@
 ;;
 ;; * XTERM 256 colors
 ;;
+;; * AIXTERM bright foreground color
+;;
+;; * AIXTERM bright background color (since 1.8)
+;;
+;; * Use bold for bright (since 1.8)
+;;
 ;; * Works with compilation-mode
 ;;
 ;; * Works with eshell
@@ -57,6 +63,18 @@
 ;; In Emacs Lisp, call xterm-color-filter to propertize strings that you can
 ;; then insert into a buffer. All state is kept in buffer-local variables
 ;; which means that control sequences can span xterm-color-filter call boundaries.
+;;
+;; You may customize `xterm-color-debug' (default NIL, if T you will get warnings
+;; in *Messages* when unsupported escape sequences are encountered),
+;; `xterm-color-use-bold-for-bright' (default NIL), `xterm-color-names',
+;; `xterm-color-names-bright'. Additionally, you may set `xterm-color-preserve-properties'
+;; to T (default NIL, should be set to T if using xterm-color with eshell, see below).
+;;
+;; A buffer-local face attribute cache is used since 1.8 to improve performance.
+;; This means that if you change `xterm-color-names' or `xterm-color-names-bright'
+;; or `xterm-color-use-bold-for-bright' at runtime and want the changes to take
+;; effect in a pre-existing buffer with activated xterm-color, you will need to
+;; run `xterm-color-clear-cache' in relevant buffer.
 ;;
 ;; Example:
 ;;
@@ -126,6 +144,21 @@
 ;;                proc
 ;;                (lambda (proc string)
 ;;                  (funcall 'compilation-filter proc (xterm-color-filter string)))))))
+;;
+;;; Notes:
+;;
+;; Unsupported SGR attributes: 5 (slow blink), 6 (rapid blink), 8 (conceal),
+;; 10 (primary font), 11-19 (alternative font), 20 (fraktur), 21 (double underline),
+;; 25 (blink off), 29 (reveal), 52 (encircled), 60-65 (ideogram)
+;;
+;; Most of these can not be mapped to Emacs face properties. The rest may be
+;; supported in a future release.
+;;
+;; Supported SGR attributes: Look at `xterm-color--dispatch-SGR'.
+;; SGR attribute 1 is rendered as bright unless `xterm-color-use-bold-for-bright'
+;; is T which will, if current Emacs font has a bold variant, switch to bold.
+;; SGR attributes 38 and 48 are only supported in their 256 color variants,
+;; not full RGB.
 
 ;;; Test:
 ;;
@@ -154,6 +187,11 @@
 
 (defcustom xterm-color-debug nil
   "Print ANSI state machine debug information in *Messages* if not NIL."
+  :type 'boolean
+  :group 'xterm-color)
+
+(defcustom xterm-color-use-bold-for-bright nil
+  "Render bright foreground attribute as bold."
   :type 'boolean
   :group 'xterm-color)
 
@@ -347,8 +385,8 @@ using other functions, it is possible to skip elements."
     (:match (0)  (reset!))                             ; RESET everything
     (:match ((<= 30 elem 37)) (set-f! (- elem 30)))     ; ANSI FG color
     (:match ((<= 40 elem 47)) (set-b! (- elem 40)))     ; ANSI BG color
-    (:match (39) (set-f! nil))                         ; RESET FG color
-    (:match (49) (set-b! nil))                         ; RESET BG color
+    (:match (39) (set-f! nil))                         ; RESET FG color (switch to default)
+    (:match (49) (set-b! nil))                         ; RESET BG color (switch to default)
     (:match (1)  (set-a! +bright+))
     (:match (2)  (set-a! +bright+ :clear t))
     (:match (3)  (set-a! +italic+))
@@ -372,7 +410,9 @@ using other functions, it is possible to skip elements."
             ;; Rather than setting the bright attribute, which would be a bug,
             ;; rescale the color to fall within the range 8-15 which
             ;; xterm-color-256 will map to xterm-color-names-bright.
-            (set-f! (- elem 82)))))
+            (set-f! (- elem 82)))
+    ;; Same for BG, rescale to 8-15
+    (:match ((<= 100 elem 107)) (set-b! (- elem 92))))) ; AIXTERM hi-intensity BG
 
 (defsubst xterm-color--SGR-attributes (list)
   "Convert LIFO list of SGR characters to FIFO list of SGR attributes (integers).
@@ -454,13 +494,24 @@ in LIFO order."
                                      (when (is-set? +negative+)       (face-add :inverse-video t))
                                      (when (is-set? +overline+)       (face-add :overline t))
                                      (when (is-set? +frame+)          (face-add :box t))
-                                     (when xterm-color--current-fg
-                                       (face-add :foreground
-                                                 (xterm-color-256
-                                                  (if (and (<= xterm-color--current-fg 7)
-                                                           (is-set? +bright+))
-                                                      (+ xterm-color--current-fg 8)
-                                                    xterm-color--current-fg))))
+                                     (if xterm-color--current-fg
+                                         (if (and xterm-color-use-bold-for-bright
+                                                  (or (is-set? +bright+)
+                                                      (<= 8 xterm-color--current-fg 15)))
+                                           (progn (face-add :weight 'bold)
+                                                  (face-add :foreground
+                                                            (xterm-color-256 (if (<= 8 xterm-color--current-fg)
+                                                                                 (- xterm-color--current-fg 8)
+                                                                               xterm-color--current-fg))))
+                                           (face-add :foreground
+                                                     (xterm-color-256
+                                                      (if (and (<= xterm-color--current-fg 7)
+                                                               (is-set? +bright+))
+                                                          (+ xterm-color--current-fg 8)
+                                                        xterm-color--current-fg))))
+                                       (when (and xterm-color-use-bold-for-bright
+                                                  (is-set? +bright+))
+                                         (face-add :weight 'bold)))
                                      (when xterm-color--current-bg
                                        (face-add :background (xterm-color-256 xterm-color--current-bg)))
                                      (setf (face-cache-get) plistf))))
@@ -627,74 +678,139 @@ effect when called from a buffer that does not have a cache."
        (insert-file-contents-literally ,path)
        (xterm-color-colorize-buffer))))
 
-(let ((test-attributes
-       '((1  . "bright")
-         (51 . "frame")
-         (3  . "italic")
-         (4  . "underline")
-         (7  . "negative")
-         (9  . "strike through")
-         (53 . "overline"))))
+(cl-defmacro xterm-color--with-tests (&body body)
+  `(cl-labels ((ansi-filter (msg &rest args)
+                            (insert
+                             (xterm-color-filter
+                              (apply 'format msg args))))
+               (test (name &rest attribs)
+                     (ansi-filter "[0;%smThis is only a test![0m\t --[ %s ]\n"
+                                  (mapconcat 'identity attribs ";")
+                                  name)))
+     ,@body))
 
-  (defun xterm-color--test-ansi ()
-    ;; System colors
-    (insert "* ANSI system colors\n\n")
-    (cl-loop for color from 40 to 47 do
-	     (insert (xterm-color-filter (format "[0;%sm  " color)))
-	     finally (insert (xterm-color-filter "[0m\n\n")))
+(defun xterm-color--test-ansi ()
+  (xterm-color--with-tests
+   (let ((test-attributes
+          '(("1"    . "bright")
+            ("51"   . "frame")
+            ("3"    . "italic")
+            ("4"    . "underline")
+            ("7"    . "negative")
+            ("9"    . "strike through")
+            ("53"   . "overline")
+            ("1;51" . "bright + frame")
+            ("1;3"  . "bright + italic")
+            ("1;4"  . "bright + underline")
+            ("1;7"  . "bright + negative")
+            ("1;9"  . "bright + strike through")
+            ("1;53" . "bright + overline"))))
 
-    ;; Attributes (no color)
-    (insert "* ANSI attributes (default colors)\n\n")
-    (cl-loop for (attrib . name) in test-attributes do
-	     (insert (xterm-color-filter (format "[0;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-	     finally (insert "\n"))
+     ;; Attributes (no color)
+     (insert "* ANSI attributes (default colors)\n")
 
-    ;; Attributes (blue fg)
-    (insert "* ANSI attributes (blue foreground)\n\n")
-    (cl-loop for (attrib . name) in test-attributes do
-	     (insert (xterm-color-filter (format "[0;34;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-	     finally (insert "\n"))
+     (if xterm-color-use-bold-for-bright
+         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect bright not to be rendered since no foreground color is set"))
+     (insert "\n\n")
 
-    ;; Attributes (blue bg)
-    (insert "* ANSI attributes (blue background)\n\n")
-    (cl-loop for (attrib . name) in test-attributes do
-	     (insert (xterm-color-filter (format "[0;44;%smThis is only a test![0m\t --[ %s ]\n" attrib name)))
-	     finally (insert "\n"))
+     (cl-loop for (attrib . name) in test-attributes
+              do (test name attrib)
+              finally (insert "\n"))
 
-    ;; Various test cases
-    (insert "* Various\n\n")
-    (insert (xterm-color-filter "Default [34;1mBright blue[39m Reset-fg-color [34mBlue (should be bright)[0m\t --[ Reseting FG color should not affect other SGR bits ]\n"))
-    (insert (xterm-color-filter "Default [94mBright blue[34m Switch-to-blue (should be normal intensity)[0m\t --[ AIXTERM bright color should not set bright SGR bit ]\n"))
-    (insert "\n")))
+     ;; Attributes (blue fg)
+     (insert "* ANSI attributes (blue foreground)\n")
+
+     (if xterm-color-use-bold-for-bright
+         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect to see bright rendered as bright color"))
+     (insert "\n\n")
+
+     (cl-loop for (attrib . name) in test-attributes
+              do (test name "34" attrib)
+              finally (insert "\n"))
+
+     ;; Attributes (blue bg)
+     (insert "* ANSI attributes (blue background)\n")
+
+     (if xterm-color-use-bold-for-bright
+         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect bright not to be rendered since no foreground color is set"))
+     (insert "\n\n")
+
+     (cl-loop for (attrib . name) in test-attributes
+              do (test name "44" attrib)
+              finally (insert "\n"))
+
+     ;; Attributes (AIXTERM blue fg)
+     (insert "* ANSI attributes (AIXTERM blue foreground)\n")
+
+     (if xterm-color-use-bold-for-bright
+         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect to see bright color everywhere due to AIXTERM"))
+     (insert "\n\n")
+
+     (cl-loop for (attrib . name) in test-attributes
+              do (test name "94" attrib)
+              finally (insert "\n"))
+
+     ;; Attributes (AIXTERM red bg)
+     (insert "* ANSI attributes (AIXTERM red background)\n")
+     (insert "  Expect to see bright background color due to AIXTERM\n")
+     (if xterm-color-use-bold-for-bright
+         (insert "  Expect to see bold instead of bright for foreground, if current Emacs font has bold variant\n\n")
+       (insert "\n"))
+
+     (cl-loop for (attrib . name) in test-attributes
+              do (test name "101" attrib)
+              finally (insert "\n"))
+
+     ;; Various test cases
+     (insert "* Various\n")
+     (if xterm-color-use-bold-for-bright
+         (progn
+           (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant\n")
+           (insert "  Otherwise expect to see bright rendered as normal intensity\n\n"))
+       (insert "\n"))
+
+     (ansi-filter "Default [34;1mBright blue[39m Reset-fg-color [34mBlue (should be bright)[0m\t --[ Resetting FG color should not affect other SGR bits ]\n")
+     (ansi-filter "Default [94mBright blue[34m Switch-to-blue (should be normal intensity)[0m\t --[ AIXTERM bright color should not set bright SGR bit ]\n")
+     (insert "\n"))))
 
 (defun xterm-color--test-xterm ()
-  ;; Normal ANSI colors mapped to XTERM
-  (insert "* ANSI colors mapped to XTERM\n\n")
-  (cl-loop for color from 0 to 7 do
-	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
-	   finally (insert (xterm-color-filter "[0m\n\n")))
+  (xterm-color--with-tests
+   ;; System colors
+   (cl-loop for color from 40 to 47
+            do (ansi-filter "[0;%sm  " color)
+            finally (ansi-filter "[0m * ANSI system colors\n"))
 
-  ;; Bright ANSI colors mapped to XTERM
-  (insert "* ANSI bright colors mapped to XTERM\n\n")
-  (cl-loop for color from 8 to 15 do
-	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
-	   finally (insert (xterm-color-filter "[0m\n\n")))
+   ;; Normal ANSI colors mapped to XTERM
+   (cl-loop for color from 0 to 7
+            do (ansi-filter "[48;5;%sm  " color)
+            finally (ansi-filter "[0m * ANSI colors mapped to XTERM\n"))
 
-  ;; XTERM 256 color cubes
-  (insert "*  XTERM 256 color cubes\n\n")
-  (cl-loop for green from 0 to 5 do
-	   (cl-loop for red from 0 to 5 do
-		    (cl-loop for blue from 0 to 5
-			     for color = (+ 16 (* 36 red) (* green 6) blue) do
-			     (insert (xterm-color-filter (format "[48;5;%sm  [0m" color))))
-		    (insert (xterm-color-filter "[0m ")))
-	   (insert "\n"))
-  (insert "\n")
+   ;; Bright ANSI colors mapped to XTERM
+   (cl-loop for color from 8 to 15
+            do (ansi-filter "[48;5;%sm  " color)
+            finally (ansi-filter "[0m * ANSI bright colors mapped to XTERM\n\n"))
 
-  (insert "*  XTERM color grayscale ramp\n\n")
-  (cl-loop for color from 232 to 255 do
-	   (insert (xterm-color-filter (format "[48;5;%sm  " color)))
-	   finally (insert (xterm-color-filter "[0m\n\n"))))
+   ;; XTERM 256 color cubes
+   (insert "*  XTERM 256 color cubes\n\n")
+
+   (cl-loop for green from 0 to 5 do
+            (cl-loop for red from 0 to 5 do
+                     (cl-loop for blue from 0 to 5
+                              for color = (+ 16 (* 36 red) (* green 6) blue)
+                              do (ansi-filter "[48;5;%sm  [0m" color))
+                     (ansi-filter "[0m "))
+            (insert "\n"))
+
+   (insert "\n")
+   (insert "*  XTERM color grayscale ramp\n\n")
+
+   (cl-loop for color from 232 to 255
+            do (ansi-filter "[48;5;%sm  " color)
+            finally (ansi-filter "[0m\n\n"))))
 
 ;;;###autoload
 (defun xterm-color-test ()
@@ -703,11 +819,21 @@ effect when called from a buffer that does not have a cache."
   (let* ((name (generate-new-buffer-name "*xterm-color-test*"))
          (buf (get-buffer-create name)))
     (switch-to-buffer buf))
-  (xterm-color--test-ansi)
+
   (xterm-color--test-xterm)
+
+  (let ((xterm-color-use-bold-for-bright nil))
+    (xterm-color--test-ansi))
+  (xterm-color-clear-cache)
+
+  (insert "; Temporarily setting `xterm-color-use-bold-for-bright' to T\n")
+  (insert "; Current Emacs font needs to have a bold variant\n\n")
+
+  (let ((xterm-color-use-bold-for-bright t))
+    (xterm-color--test-ansi))
+
   (setq buffer-read-only t)
   (goto-char (point-min)))
-
 
 (provide 'xterm-color)
 ;;; xterm-color.el ends here
