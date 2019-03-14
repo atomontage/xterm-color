@@ -7,6 +7,9 @@ xterm-color.el is an ANSI control sequence to text-property translator
 * Features
 + Regular ANSI color support
 + XTERM 256 color support
++ AIXTERM bright foreground color
++ AIXTERM bright background color (since 1.8)
++ Use bold instead of bright (since 1.8)
 + Works with compilation-mode
 + Works with eshell
 + Bonus: Faster than ansi-color.el
@@ -17,6 +20,15 @@ Interactively or from Emacs Lisp, call xterm-color-colorize-buffer to colorize a
 In Emacs Lisp code call xterm-color-filter to propertize strings that you can then insert into
 a buffer. All state is kept in buffer-local variables which means that
 control sequences can span /xterm-color-filter/ call boundaries.
+
+You may customize /xterm-color-debug/ (default NIL, if T you will get warnings in *Messages* when
+unsupported escape sequences are encountered), /xterm-color-use-bold-for-bright/ (default NIL),
+/xterm-color-names/,  /xterm-color-names-bright/. Additionally, you may set
+/xterm-color-preserve-properties/ to T (default NIL, should be set to T if using xterm-color with
+eshell, see below). A buffer-local face attribute cache is used since 1.8 to improve performance.
+This means that if you change /xterm-color-names/ or /xterm-color-names-bright/ or
+/xterm-color-use-bold-for-bright/ at runtime and want the changes to take effect in a pre-existing
+buffer with activated xterm-color, you will need to run /xterm-color-clear-cache/ in relevant buffer.
 
 Example:
 
