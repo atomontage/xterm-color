@@ -382,11 +382,11 @@ using other functions, it is possible to skip elements."
 (defsubst xterm-color--dispatch-SGR (SGR-list)
   "Update state machine based on SGR-LIST which should be a list of SGR attributes (integers)."
   (xterm-color--create-SGR-table (elem SGR-list)
-    (:match (0)  (reset!))                             ; RESET everything
+    (:match (0)  (reset!))                              ; RESET everything
     (:match ((<= 30 elem 37)) (set-f! (- elem 30)))     ; ANSI FG color
     (:match ((<= 40 elem 47)) (set-b! (- elem 40)))     ; ANSI BG color
-    (:match (39) (set-f! nil))                         ; RESET FG color (switch to default)
-    (:match (49) (set-b! nil))                         ; RESET BG color (switch to default)
+    (:match (39) (set-f! nil))                          ; RESET FG color (switch to default)
+    (:match (49) (set-b! nil))                          ; RESET BG color (switch to default)
     (:match (1)  (set-a! +bright+))
     (:match (2)  (set-a! +bright+ :clear t))
     (:match (3)  (set-a! +italic+))
@@ -398,9 +398,9 @@ using other functions, it is possible to skip elements."
     (:match (24) (set-a! +underline+ :clear t))
     (:match (27) (set-a! +negative+ :clear t))
     (:match (29) (set-a! +strike-through+ :clear t))
-    (:match (38 'cl-cdddr)                             ; XTERM 256 FG color
+    (:match (38 'cl-cdddr)                              ; XTERM 256 FG color
             (set-f! (cl-third SGR-list)))
-    (:match (48 'cl-cdddr)                             ; XTERM 256 BG color
+    (:match (48 'cl-cdddr)                              ; XTERM 256 BG color
             (set-b! (cl-third SGR-list)))
     (:match (51) (set-a! +frame+))
     (:match (53) (set-a! +overline+))
