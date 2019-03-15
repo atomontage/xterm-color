@@ -718,7 +718,6 @@ effect when called from a buffer that does not have a cache."
               do (test name attrib)
               finally (insert "\n"))
 
-     ;; Attributes (blue fg)
      (insert "* ANSI attributes (blue foreground)\n")
 
      (if xterm-color-use-bold-for-bright
@@ -730,7 +729,6 @@ effect when called from a buffer that does not have a cache."
               do (test name "34" attrib)
               finally (insert "\n"))
 
-     ;; Attributes (blue bg)
      (insert "* ANSI attributes (blue background)\n")
 
      (if xterm-color-use-bold-for-bright
@@ -742,7 +740,6 @@ effect when called from a buffer that does not have a cache."
               do (test name "44" attrib)
               finally (insert "\n"))
 
-     ;; Attributes (AIXTERM blue fg)
      (insert "* ANSI attributes (AIXTERM blue foreground)\n")
 
      (if xterm-color-use-bold-for-bright
@@ -754,7 +751,6 @@ effect when called from a buffer that does not have a cache."
               do (test name "94" attrib)
               finally (insert "\n"))
 
-     ;; Attributes (AIXTERM red bg)
      (insert "* ANSI attributes (AIXTERM red background)\n")
      (insert "  Expect to see bright background color due to AIXTERM\n")
      (if xterm-color-use-bold-for-bright
@@ -765,7 +761,6 @@ effect when called from a buffer that does not have a cache."
               do (test name "101" attrib)
               finally (insert "\n"))
 
-     ;; Various test cases
      (insert "* Various\n")
      (if xterm-color-use-bold-for-bright
          (progn
