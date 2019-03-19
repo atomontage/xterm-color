@@ -80,10 +80,10 @@
 ;;
 ;; (let ((buffer (generate-new-buffer "*xterm-color-test*")))
 ;;   (with-current-buffer buffer
-;;     (insert (xterm-color-filter "[0;1;3;4"))
+;;     (insert (xterm-color-filter "\x1b[0;1;3;4"))
 ;;     (insert (xterm-color-filter ";35"))
 ;;     (insert (xterm-color-filter ";51mThis is only a test"))
-;;     (insert (xterm-color-filter "[0m")))
+;;     (insert (xterm-color-filter "\x1b[0m")))
 ;;   (switch-to-buffer buffer))
 ;;
 ;;
@@ -678,13 +678,17 @@ effect when called from a buffer that does not have a cache."
        (insert-file-contents-literally ,path)
        (xterm-color-colorize-buffer))))
 
+(defvar xterm-color--test-do-filter t)
+
 (cl-defmacro xterm-color--with-tests (&body body)
   `(cl-labels ((ansi-filter (msg &rest args)
                             (insert
-                             (xterm-color-filter
-                              (apply 'format msg args))))
+                             (if xterm-color--test-do-filter
+                                 (xterm-color-filter
+                                  (apply 'format msg args))
+                               (apply 'format msg args))))
                (test (name &rest attribs)
-                     (ansi-filter "[0;%smThis is only a test![0m\t --[ %s ]\n"
+                     (ansi-filter "\x1b[0;%smThis is only a test!\x1b[0m\t --[ %s ]\n"
                                   (mapconcat 'identity attribs ";")
                                   name)))
      ,@body))
@@ -768,26 +772,26 @@ effect when called from a buffer that does not have a cache."
            (insert "  Otherwise expect to see bright rendered as normal intensity\n\n"))
        (insert "\n"))
 
-     (ansi-filter "Default [34;1mBright blue[39m Reset-fg-color [34mBlue (should be bright)[0m\t --[ Resetting FG color should not affect other SGR bits ]\n")
-     (ansi-filter "Default [94mBright blue[34m Switch-to-blue (should be normal intensity)[0m\t --[ AIXTERM bright color should not set bright SGR bit ]\n")
+     (ansi-filter "Default \x1b[34;1mBright blue\x1b[39m Reset-fg-color \x1b[34mBlue (should be bright)\x1b[0m\t --[ Resetting FG color should not affect other SGR bits ]\n")
+     (ansi-filter "Default \x1b[94mBright blue\x1b[34m Switch-to-blue (should be normal intensity)\x1b[0m\t --[ AIXTERM bright color should not set bright SGR bit ]\n")
      (insert "\n"))))
 
 (defun xterm-color--test-xterm ()
   (xterm-color--with-tests
    ;; System colors
    (cl-loop for color from 40 to 47
-            do (ansi-filter "[0;%sm  " color)
-            finally (ansi-filter "[0m * ANSI system colors\n"))
+            do (ansi-filter "\x1b[0;%sm  " color)
+            finally (ansi-filter "\x1b[0m * ANSI system colors\n"))
 
    ;; Normal ANSI colors mapped to XTERM
    (cl-loop for color from 0 to 7
-            do (ansi-filter "[48;5;%sm  " color)
-            finally (ansi-filter "[0m * ANSI colors mapped to XTERM\n"))
+            do (ansi-filter "\x1b[48;5;%sm  " color)
+            finally (ansi-filter "\x1b[0m * ANSI colors mapped to XTERM\n"))
 
    ;; Bright ANSI colors mapped to XTERM
    (cl-loop for color from 8 to 15
-            do (ansi-filter "[48;5;%sm  " color)
-            finally (ansi-filter "[0m * ANSI bright colors mapped to XTERM\n\n"))
+            do (ansi-filter "\x1b[48;5;%sm  " color)
+            finally (ansi-filter "\x1b[0m * ANSI bright colors mapped to XTERM\n\n"))
 
    ;; XTERM 256 color cubes
    (insert "*  XTERM 256 color cubes\n\n")
@@ -796,20 +800,20 @@ effect when called from a buffer that does not have a cache."
             (cl-loop for red from 0 to 5 do
                      (cl-loop for blue from 0 to 5
                               for color = (+ 16 (* 36 red) (* green 6) blue)
-                              do (ansi-filter "[48;5;%sm  [0m" color))
-                     (ansi-filter "[0m "))
+                              do (ansi-filter "\x1b[48;5;%sm  \x1b[0m" color))
+                     (ansi-filter "\x1b[0m "))
             (insert "\n"))
 
    (insert "\n")
    (insert "*  XTERM color grayscale ramp\n\n")
 
    (cl-loop for color from 232 to 255
-            do (ansi-filter "[48;5;%sm  " color)
-            finally (ansi-filter "[0m\n\n"))))
+            do (ansi-filter "\x1b[48;5;%sm  " color)
+            finally (ansi-filter "\x1b[0m\n\n"))))
 
 ;;;###autoload
 (defun xterm-color-test ()
-  "Create and display a new buffer that contains ANSI control sequences."
+  "Create/display and render a new buffer that contains ANSI control sequences."
   (interactive)
   (let* ((name (generate-new-buffer-name "*xterm-color-test*"))
          (buf (get-buffer-create name)))
@@ -828,6 +832,22 @@ effect when called from a buffer that does not have a cache."
     (xterm-color--test-ansi))
 
   (setq buffer-read-only t)
+  (goto-char (point-min)))
+
+;;;###autoload
+(defun xterm-color-test-raw ()
+  "Create and display a new buffer that contains ANSI control sequences.
+The ANSI sequences will not be processed. One can use a different Emacs
+package (e.g. ansi-color.el) to do so. This function is provided to ease
+comparisons of xterm-color.el with other similar libraries."
+  (interactive)
+  (let* ((name (generate-new-buffer-name "*xterm-color-test-raw*"))
+         (buf (get-buffer-create name)))
+    (switch-to-buffer buf))
+
+  (let (xterm-color--test-do-filter)
+    (xterm-color--test-xterm)
+    (xterm-color--test-ansi))
   (goto-char (point-min)))
 
 (provide 'xterm-color)

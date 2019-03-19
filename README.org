@@ -35,10 +35,10 @@ Example:
 #+BEGIN_SRC emacs-lisp
 (let ((buffer (generate-new-buffer "*xterm-color-test*")))
   (with-current-buffer buffer
-    (insert (xterm-color-filter "[0;1;3;4"))
+    (insert (xterm-color-filter "\x1b[0;1;3;4"))
     (insert (xterm-color-filter ";35"))
     (insert (xterm-color-filter ";51mThis is only a test"))
-    (insert (xterm-color-filter "[0m")))
+    (insert (xterm-color-filter "\x1b[0m")))
   (switch-to-buffer buffer))
 #+END_SRC
 
