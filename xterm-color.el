@@ -471,60 +471,60 @@ in LIFO order."
 (defmacro xterm-color--with-ANSI-macro-helpers (&rest body)
   (declare (indent defun))
   `(xterm-color--with-SGR-constants
-    (cl-macrolet
-        ((output (x)          `(push ,x result))
-         (update-char-list () `(push char xterm-color--char-list))
-         (update-CSI-list ()  `(push char xterm-color--CSI-list))
+     (cl-macrolet
+         ((out! (x)            `(push ,x result))
+          (push-char! (c)      `(push ,c xterm-color--char-list))
+          (push-csi! (c)       `(push ,c xterm-color--CSI-list))
 
-         (new-state (s)       `(setq state ,s))
-         (has-color? ()       `(or xterm-color--current-fg
-                                   xterm-color--current-bg
-                                   (/= xterm-color--attributes 0)))
-         (is-set? (attrib)    `(/= (logand ,attrib xterm-color--attributes) 0))
-         (face-cache-get ()   `(gethash (logior (ash xterm-color--attributes 16)
-                                                (ash (or xterm-color--current-bg 0) 8)
-                                                (or xterm-color--current-fg 0))
-                                        xterm-color--face-cache))
-         (face-add (k v)      `(setq plistf (plist-put plistf ,k ,v)))
-         (make-face ()        `(or (face-cache-get)
-                                   (let (plistf)
-                                     (when (is-set? +italic+)         (face-add :slant 'italic))
-                                     (when (is-set? +underline+)      (face-add :underline t))
-                                     (when (is-set? +strike-through+) (face-add :strike-through t))
-                                     (when (is-set? +negative+)       (face-add :inverse-video t))
-                                     (when (is-set? +overline+)       (face-add :overline t))
-                                     (when (is-set? +frame+)          (face-add :box t))
-                                     (if xterm-color--current-fg
-                                         (if (and xterm-color-use-bold-for-bright
-                                                  (or (is-set? +bright+)
-                                                      (<= 8 xterm-color--current-fg 15)))
-                                           (progn (face-add :weight 'bold)
-                                                  (face-add :foreground
+          (state! (s)          `(setq state ,s))
+          (color? ()           `(or xterm-color--current-fg
+                                    xterm-color--current-bg
+                                    (/= xterm-color--attributes 0)))
+          (has? (attrib)       `(/= (logand ,attrib xterm-color--attributes) 0))
+          (face-cache-get ()   `(gethash (logior (ash xterm-color--attributes 16)
+                                                 (ash (or xterm-color--current-bg 0) 8)
+                                                 (or xterm-color--current-fg 0))
+                                         xterm-color--face-cache))
+          (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
+          (make-face ()        `(or (face-cache-get)
+                                    (let (plistf)
+                                      (when (has? +italic+)         (face! :slant 'italic))
+                                      (when (has? +underline+)      (face! :underline t))
+                                      (when (has? +strike-through+) (face! :strike-through t))
+                                      (when (has? +negative+)       (face! :inverse-video t))
+                                      (when (has? +overline+)       (face! :overline t))
+                                      (when (has? +frame+)          (face! :box t))
+                                      (if xterm-color--current-fg
+                                          (if (and xterm-color-use-bold-for-bright
+                                                   (or (has? +bright+)
+                                                       (<= 8 xterm-color--current-fg 15)))
+                                              (progn (face! :weight 'bold)
+                                                     (face! :foreground
                                                             (xterm-color-256 (if (<= 8 xterm-color--current-fg)
                                                                                  (- xterm-color--current-fg 8)
                                                                                xterm-color--current-fg))))
-                                           (face-add :foreground
-                                                     (xterm-color-256
-                                                      (if (and (<= xterm-color--current-fg 7)
-                                                               (is-set? +bright+))
-                                                          (+ xterm-color--current-fg 8)
-                                                        xterm-color--current-fg))))
-                                       (when (and xterm-color-use-bold-for-bright
-                                                  (is-set? +bright+))
-                                         (face-add :weight 'bold)))
-                                     (when xterm-color--current-bg
-                                       (face-add :background (xterm-color-256 xterm-color--current-bg)))
-                                     (setf (face-cache-get) plistf))))
-         (maybe-fontify ()    '(when xterm-color--char-list
-                                 (let ((s (concat (nreverse xterm-color--char-list))))
-                                   (when (has-color?)
-                                     (add-text-properties
-                                      0 (length s)
-                                      (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-face))
-                                      s))
-                                   (output s))
-                                 (setq xterm-color--char-list nil))))
-      ,@body)))
+                                            (face! :foreground
+                                                   (xterm-color-256
+                                                    (if (and (<= xterm-color--current-fg 7)
+                                                             (has? +bright+))
+                                                        (+ xterm-color--current-fg 8)
+                                                      xterm-color--current-fg))))
+                                        (when (and xterm-color-use-bold-for-bright
+                                                   (has? +bright+))
+                                          (face! :weight 'bold)))
+                                      (when xterm-color--current-bg
+                                        (face! :background (xterm-color-256 xterm-color--current-bg)))
+                                      (setf (face-cache-get) plistf))))
+          (maybe-fontify ()    '(when xterm-color--char-list
+                                  (let ((s (concat (nreverse xterm-color--char-list))))
+                                    (when (color?)
+                                      (add-text-properties
+                                       0 (length s)
+                                       (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-face))
+                                       s))
+                                    (out! s))
+                                  (setq xterm-color--char-list nil))))
+       ,@body)))
 
 
 ;;;
@@ -549,36 +549,36 @@ This function strips text properties that may be present in STRING."
         (cond
          ((= char 27)                    ; ESC
           (maybe-fontify)
-          (new-state :ansi-esc))
+          (state! :ansi-esc))
          (t
-          (if (has-color?)
-              (update-char-list)
-            (output (string char))))))
+          (if (color?)
+              (push-char! char)
+            (out! (string char))))))
        (:ansi-esc
         (cond ((= char ?\[)
-               (new-state :ansi-csi))
+               (state! :ansi-csi))
               ((= char ?\])
-               (new-state :ansi-osc))
+               (state! :ansi-osc))
               (t
-               (update-char-list)
-               (new-state :char))))
+               (push-char! char)
+               (state! :char))))
        (:ansi-csi
-        (update-CSI-list)
+        (push-csi! char)
         (when (and (>= char #x40)
                    (<= char #x7e))
           (xterm-color--dispatch-CSI)
-          (new-state :char)))
+          (state! :char)))
        (:ansi-osc
         ;; OSC sequences are skipped
         (cond ((= char 7)
-               (new-state :char))
+               (state! :char))
               ((= char 27)
                ;; ESC
-               (new-state :ansi-osc-esc))))
+               (state! :ansi-osc-esc))))
        (:ansi-osc-esc
         (cond ((= char ?\\)
-               (new-state :char))
-              (t (new-state :ansi-osc)))))
+               (state! :char))
+              (t (state! :ansi-osc)))))
      finally return
      (progn (when (eq state :char) (maybe-fontify))
             (setq xterm-color--state state)
@@ -714,8 +714,8 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (default colors)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
-       (insert "  Expect bright not to be rendered since no foreground color is set"))
+         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect: Bright not to be rendered since no foreground color is set"))
      (insert "\n\n")
 
      (cl-loop for (attrib . name) in test-attributes
@@ -725,8 +725,8 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (blue foreground)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
-       (insert "  Expect to see bright rendered as bright color"))
+         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect: Bright rendered as bright color"))
      (insert "\n\n")
 
      (cl-loop for (attrib . name) in test-attributes
@@ -736,8 +736,8 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (blue background)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
-       (insert "  Expect bright not to be rendered since no foreground color is set"))
+         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect: Bright not to be rendered since no foreground color is set"))
      (insert "\n\n")
 
      (cl-loop for (attrib . name) in test-attributes
@@ -747,8 +747,8 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (AIXTERM blue foreground)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant")
-       (insert "  Expect to see bright color everywhere due to AIXTERM"))
+         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+       (insert "  Expect: Bright color everywhere due to AIXTERM"))
      (insert "\n\n")
 
      (cl-loop for (attrib . name) in test-attributes
@@ -756,9 +756,9 @@ effect when called from a buffer that does not have a cache."
               finally (insert "\n"))
 
      (insert "* ANSI attributes (AIXTERM red background)\n")
-     (insert "  Expect to see bright background color due to AIXTERM\n")
+     (insert "  Expect: Bright background color due to AIXTERM\n")
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect to see bold instead of bright for foreground, if current Emacs font has bold variant\n\n")
+         (insert "  Expect: Bold instead of bright for foreground, if current Emacs font has bold variant\n\n")
        (insert "\n"))
 
      (cl-loop for (attrib . name) in test-attributes
@@ -768,8 +768,8 @@ effect when called from a buffer that does not have a cache."
      (insert "* Various\n")
      (if xterm-color-use-bold-for-bright
          (progn
-           (insert "  Expect to see bold instead of bright, if current Emacs font has bold variant\n")
-           (insert "  Otherwise expect to see bright rendered as normal intensity\n\n"))
+           (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant\n")
+           (insert "          Otherwise bright rendered as normal intensity\n\n"))
        (insert "\n"))
 
      (ansi-filter "Default \x1b[34;1mBright blue\x1b[39m Reset-fg-color \x1b[34mBlue (should be bright)\x1b[0m\t --[ Resetting FG color should not affect other SGR bits ]\n")
@@ -836,10 +836,10 @@ effect when called from a buffer that does not have a cache."
 
 ;;;###autoload
 (defun xterm-color-test-raw ()
-  "Create and display a new buffer that contains ANSI control sequences.
+  "Create and display a new buffer that contains ANSI SGR control sequences.
 The ANSI sequences will not be processed. One can use a different Emacs
-package (e.g. ansi-color.el) to do so. This function is provided to ease
-comparisons of xterm-color.el with other similar libraries."
+package (e.g. ansi-color.el) to do so. In that way it is easy to compare
+xterm-color.el with other functionally similar libraries."
   (interactive)
   (let* ((name (generate-new-buffer-name "*xterm-color-test-raw*"))
          (buf (get-buffer-create name)))
