@@ -464,9 +464,7 @@ in LIFO order."
                 '(0)
               (xterm-color--SGR-attributes params))))
           (t
-           (xterm-color--message
-            "xterm-color: %s CSI %s not implemented"
-            csi (if (= ?J term) "(clear screen)" ""))))))
+           (xterm-color--message "xterm-color: %s CSI not implemented" csi)))))
 
 (defmacro xterm-color--with-ANSI-macro-helpers (&rest body)
   (declare (indent defun))
