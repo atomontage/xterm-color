@@ -55,7 +55,7 @@ The recommended configuration is to remove ansi-color-process-output from
 comint-output-filter-functions and add xterm-color-filter as the *first*
 hook in the buffer-local comint-preoutput-filter-functions for any comint-based
 mode that you would like it to affect (e.g. shell-mode). Additionally, it is
-recommended to disable font-locking for shell-mode buffers since it seems
+recommended to disable font-locking for shell-mode buffers
 [[https://github.com/atomontage/xterm-color/issues/28][since it seems to interact badly with comint and drastically affect performance]].
 Font locking in shell-mode buffers is superfluous since xterm-color.el will
 handle faces fine by itself.
