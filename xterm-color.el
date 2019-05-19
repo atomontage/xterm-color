@@ -97,13 +97,26 @@
 ;;   hook in the *buffer-local* comint-preoutput-filter-functions for any comint-based
 ;;   mode that you would like it to affect (e.g. shell-mode).
 ;;
+;;   Additionally, it is recommended to disable font-locking for shell-mode buffers since
+;;   it seems to interact badly with comint and drastically affect performance
+;;   (https://github.com/atomontage/xterm-color/issues/28).
+;;
+;;   Font locking in shell-mode buffers is superfluous since xterm-color.el will handle
+;;   faces fine by itself.
+;;
 ;;   An example configuration for shell-mode (M-x shell) is shown below:
 ;;
 ;; (setq comint-output-filter-functions
 ;;       (remove 'ansi-color-process-output comint-output-filter-functions))
 ;;
 ;; (add-hook 'shell-mode-hook
-;;           (lambda () (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
+;;           (lambda ()
+;;             ;; Disable font-locking in this buffer to improve performance
+;;             (font-lock-mode -1)
+;;             ;; Prevent font-locking from being re-enabled in this buffer
+;;             (make-local-variable 'font-lock-function)
+;;             (setq font-lock-function (lambda (_) nil))
+;;             (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
 ;;
 ;; Also set TERM accordingly (xterm-256color)
 ;;
