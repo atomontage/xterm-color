@@ -234,9 +234,11 @@
   :type '(vector string string string string string string string string)
   :group 'xterm-color)
 
+
 ;;;
 ;;; Buffer locals, used by state machine
 ;;;
+
 
 (defvar xterm-color-preserve-properties nil
   "If T, preserve existing text properties on input about to be filtered.
@@ -282,15 +284,19 @@ inverse-color, frame, overline SGR state machine bits.")
 
 (make-variable-buffer-local 'xterm-color--face-cache)
 
+
 ;;;
 ;;; Constants
 ;;;
 
+
 (defconst +xterm-color--table-256+ [0 #x5f #x87 #xaf #xd7 #xff])
+
 
 ;;;
 ;;; Internal API
 ;;;
+
 
 (cl-defun xterm-color--string-properties (string)
   (cl-loop
