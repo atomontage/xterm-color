@@ -118,11 +118,11 @@
 ;;             (setq font-lock-function (lambda (_) nil))
 ;;             (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
 ;;
-;; Also set TERM accordingly (xterm-256color)
+;; Also set TERM accordingly (xterm-256color) in the shell itself.
 ;;
 ;; * You can also use it with eshell (and thus get color output from system ls):
 ;;
-;; (require 'eshell)
+;; (require 'eshell) ; or use with-eval-after-load
 ;;
 ;; (add-hook 'eshell-before-prompt-hook
 ;;           (lambda ()
@@ -130,33 +130,24 @@
 ;;
 ;;  (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
 ;;  (setq eshell-output-filter-functions (remove 'eshell-handle-ansi-color eshell-output-filter-functions))
-;;
-;;  Don't forget to setenv TERM xterm-256color
-;;
+;;  (setenv "TERM" "xterm-256color")
 ;;
 ;; * Compilation buffers
 ;;
+;; Using `compilation-shell-minor-mode' with shell-mode buffers that have xterm-color
+;; enabled is NOT recommended, as `compilation-shell-minor-mode' depends on font-locking
+;; and the latter introduces severe performance degradation. If you want it regardless,
+;; omit the statements that disable font-locking in the previously given shell-mode
+;; example configuration.
 ;;
-;; You may use `compilation-shell-minor-mode' with shell-mode buffers
-;; and the configuration previously described.
-;;
-;; For standalone compilation-mode buffers, you may use the following
-;; configuration:
+;; For standalone compilation-mode buffers, you may use the following configuration:
 ;;
 ;; (setq compilation-environment '("TERM=xterm-256color"))
 ;;
-;; (add-hook 'compilation-start-hook
-;;           (lambda (proc)
-;;             ;; Need to differentiate between compilation-mode buffers
-;;             ;; and running as part of comint (which at this point we assume
-;;             ;; has been configured separately for xterm-color)
-;;             (when (eq (process-filter proc) 'compilation-filter)
-;;               ;; This is a process associated with a compilation-mode buffer.
-;;               ;; `xterm-color-filter' should be called before its own filter function.
-;;               (set-process-filter
-;;                proc
-;;                (lambda (proc string)
-;;                  (funcall 'compilation-filter proc (xterm-color-filter string)))))))
+;; (defun my/advice-compilation-filter (f proc string)
+;;   (funcall f proc (xterm-color-filter string)))
+;;
+;; (advice-add 'compilation-filter :around #'my/advice-compilation-filter)
 ;;
 ;;; Notes:
 ;;
@@ -182,6 +173,14 @@
 ;; M-x shell || M-x eshell
 ;;
 ;; perl tests/xterm-colortest && perl tests/256colors2.pl
+;;
+;; Compare with ansi-color.el:
+;;
+;; M-x xterm-color-test-raw then M-x xterm-color-colorize-buffer
+;;
+;; and compare with
+;;
+;; M-x xterm-color-test-raw then M-: (ansi-color-apply-on-region (point-min) (point-max))
 
 ;;; Code:
 
@@ -435,6 +434,8 @@ using other functions, it is possible to skip elements."
 
 (defsubst xterm-color--SGR-attributes (list)
   "Convert LIFO list of SGR characters to FIFO list of SGR attributes (integers).
+Returns FIFO list of SGR attributes.
+
 Characters should be in the ASCII set 0-9 (decimal 48 to 57) and are converted
 to integer digits by subtracting 48 from each character. E.g. Character 48 will
 be converted to integer digit 0, character 49 to integer digit 1 and so on.
@@ -446,9 +447,7 @@ Examples:
 Given (48) return (0)
 Given (59) return (0)
 Given (48 49 50) return (210)
-Given (48 49 50 59 50 50 59 48 49) return (10 22 210)
-
-Returns FIFO list of SGR attributes."
+Given (48 49 50 59 50 50 59 48 49) return (10 22 210)"
   (cl-loop
    with mul = 1 and num = 0 and ret
    for c    = (car list) while c do
@@ -856,7 +855,7 @@ effect when called from a buffer that does not have a cache."
   "Create and display a new buffer that contains ANSI SGR control sequences.
 The ANSI sequences will not be processed. One can use a different Emacs
 package (e.g. ansi-color.el) to do so. In that way it is easy to compare
-xterm-color.el with other functionally similar libraries."
+xterm-color.el with libraries that offer similar functionality."
   (interactive)
   (let* ((name (generate-new-buffer-name "*xterm-color-test-raw*"))
          (buf (get-buffer-create name)))
