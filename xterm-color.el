@@ -3,7 +3,7 @@
 ;; Copyright (C) 2010-2019 xristos@sdf.lonestar.org
 ;; All rights reserved
 
-;; Version: 1.8 - 2019-03-01
+;; Version: 1.9 - 2019-08-15
 ;; Author: xristos <xristos@sdf.lonestar.org>
 ;; URL: https://github.com/atomontage/xterm-color
 ;; Package-Requires: ((cl-lib "0.5"))
