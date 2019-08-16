@@ -93,7 +93,7 @@ An example configuration for shell-mode (M-x shell) is shown below:
 
 Using `compilation-shell-minor-mode' with shell-mode buffers that have xterm-color
 enabled is NOT recommended, as `compilation-shell-minor-mode' depends on font-locking
-and the latter introduces severe performance degradation. If want it regardless,
+and the latter introduces severe performance degradation. If you still want to use it,
 omit the statements that disable font-locking in the previously given shell-mode
 example configuration.
 
@@ -121,13 +121,13 @@ M-x shell || M-x eshell
 
 perl tests/xterm-colortest && perl tests/256colors2.pl
 
-Compare with ansi-color.el:
+Comparison with ansi-color.el:
 
 M-x xterm-color-test-raw then M-x xterm-color-colorize-buffer
 
-and compare with
+and contrast with
 
-M-x xterm-coor-test-raw then M-: (ansi-color-apply-on-region (point-min) (point-max))
+M-x xterm-color-test-raw then M-: (ansi-color-apply-on-region (point-min) (point-max))
 
 #+END_SRC
 
