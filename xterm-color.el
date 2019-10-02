@@ -256,19 +256,19 @@ really meant for and works fine with eshell.")
 (make-variable-buffer-local 'xterm-color--current-bg)
 
 (defvar xterm-color--char-list nil
-  "List with characters that the current ANSI color applies to.
+  "List of characters that the current ANSI color applies to.
 All characters are stored in reverse, LIFO, order.")
 
 (make-variable-buffer-local 'xterm-color--char-list)
 
 (defvar xterm-color--CSI-list nil
-  "List with current ANSI CSI sequence bytes (characters).
+  "List of current ANSI CSI sequence bytes (characters).
 All characters are stored in reverse, LIFO, order.")
 
 (make-variable-buffer-local 'xterm-color--CSI-list)
 
 (defvar xterm-color--state :char
-  "The current state of the ANSI sequence state machine.")
+  "Current state of the ANSI sequence state machine.")
 
 (make-variable-buffer-local 'xterm-color--state)
 
@@ -335,8 +335,8 @@ inverse-color, frame, overline SGR state machine bits.")
 
 (cl-defmacro xterm-color--create-SGR-table ((attrib SGR-list) &body body)
   "Create an iteration/dispatch table based on provided rules that match SGR attributes.
-For each attribute in SGR-LIST, check to see if it matches a rule in BODY. If so,
-evaluate the rule body.
+For each attribute in SGR-LIST, check to see if it matches a rule in BODY and
+evaluate the rule body if that is the case.
 
 ATTRIB should be a symbol that will be bound to SGR-LIST attributes in BODY.
 SGR-LIST should be a list of SGR attributes (integers) in LIFO order.
@@ -345,13 +345,13 @@ BODY should contain rules with each rule being a list of form:
  (:match (condition &optional skip) rule-body-form..)
 
 CONDITION should be a Lisp form which will be evaluated as part of a COND
-condition clause. If it is an atom, it will be rewritten to (= CONDITION ATTRIB).
-Otherwise it will be used as is. As per COND statement, if CONDITION evaluates
+condition clause.  If it is an atom, it will be rewritten to (= CONDITION ATTRIB).
+Otherwise it will be used as is.  As per COND statement, if CONDITION evaluates
 to T, rule body forms will be evaluated as part of the body of the COND clause.
 If SKIP is given, it should be a function that will be used to iterate over SGR-LIST,
-by returning a list that the next iteration will use as SGR-LIST. If not given, CDR will
-be used, meaning the iteration will go down the SGR-LIST one element at a time. By
-using other functions, it is possible to skip elements."
+by returning a list that the next iteration will use as SGR-LIST.  If not given, CDR will
+be used, meaning the iteration will go down the SGR-LIST one element at a time.
+By using other functions, it is possible to skip elements."
   (declare (indent defun))
   `(xterm-color--with-SGR-constants
      (cl-macrolet
@@ -437,7 +437,7 @@ using other functions, it is possible to skip elements."
 Returns FIFO list of SGR attributes.
 
 Characters should be in the ASCII set 0-9 (decimal 48 to 57) and are converted
-to integer digits by subtracting 48 from each character. E.g. Character 48 will
+to integer digits by subtracting 48 from each character.  E.g. Character 48 will
 be converted to integer digit 0, character 49 to integer digit 1 and so on.
 Character 59 (;) is not converted but signifies that all accumulated integer
 digits should be reversed and combined into a single integer (SGR attribute).
@@ -853,9 +853,9 @@ effect when called from a buffer that does not have a cache."
 ;;;###autoload
 (defun xterm-color-test-raw ()
   "Create and display a new buffer that contains ANSI SGR control sequences.
-The ANSI sequences will not be processed. One can use a different Emacs
-package (e.g. ansi-color.el) to do so. In that way it is easy to compare
-xterm-color.el with libraries that offer similar functionality."
+The ANSI sequences will not be processed.  One can use a different Emacs
+package (e.g. ansi-color.el) to do so.  This is really meant to be used for
+easy comparisons/benchmarks with libraries that offer similar functionality."
   (interactive)
   (let* ((name (generate-new-buffer-name "*xterm-color-test-raw*"))
          (buf (get-buffer-create name)))
