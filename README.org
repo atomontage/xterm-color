@@ -138,4 +138,4 @@ The code comes with a BSD-style license so you can basically do with it
 whatever you want.
 
 * Author
-xristos (AT) sdf (DOT) lonestar (DOT) org
+xristos (AT) sdf (DOT) org

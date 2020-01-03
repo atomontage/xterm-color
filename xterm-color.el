@@ -1,10 +1,10 @@
 ;;; xterm-color.el --- ANSI & XTERM 256 color support -*- lexical-binding: t -*-
 
-;; Copyright (C) 2010-2019 xristos@sdf.lonestar.org
+;; Copyright (C) 2010-2019 xristos@sdf.org
 ;; All rights reserved
 
 ;; Version: 1.9 - 2019-08-15
-;; Author: xristos <xristos@sdf.lonestar.org>
+;; Author: xristos <xristos@sdf.org>
 ;; URL: https://github.com/atomontage/xterm-color
 ;; Package-Requires: ((cl-lib "0.5"))
 ;; Keywords: faces
