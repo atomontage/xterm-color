@@ -781,7 +781,7 @@ effect when called from a buffer that does not have a cache."
               do (test name "101" attrib)
               finally (insert "\n"))
 
-     (insert "* Various\n")
+     (insert "* Misc\n")
      (if xterm-color-use-bold-for-bright
          (progn
            (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant\n")
