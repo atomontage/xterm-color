@@ -14,21 +14,21 @@ xterm-color.el is an ANSI control sequence to text-property translator
 + Works with eshell
 + Bonus: Faster than ansi-color.el
 
-* Usage 
+* Usage
 Interactively or from Emacs Lisp, call xterm-color-colorize-buffer to colorize an entire buffer.
 
 In Emacs Lisp code call xterm-color-filter to propertize strings that you can then insert into
 a buffer. All state is kept in buffer-local variables which means that
-control sequences can span /xterm-color-filter/ call boundaries.
+control sequences can span /xterm-color-filter/ calls (state machine processing).
 
 You may customize /xterm-color-debug/ (default NIL, if T you will get warnings in *Messages* when
 unsupported escape sequences are encountered), /xterm-color-use-bold-for-bright/ (default NIL),
 /xterm-color-names/,  /xterm-color-names-bright/. Additionally, you may set
 /xterm-color-preserve-properties/ to T (default NIL, should be set to T if using xterm-color with
 eshell, see below). A buffer-local face attribute cache is used since 1.8 to improve performance.
-This means that if you change /xterm-color-names/ or /xterm-color-names-bright/ or
-/xterm-color-use-bold-for-bright/ at runtime and want the changes to take effect in a pre-existing
-buffer with activated xterm-color, you will need to run /xterm-color-clear-cache/ in relevant buffer.
+This means that if changes are made to /xterm-color-names/ or /xterm-color-names-bright/ or
+/xterm-color-use-bold-for-bright/ at runtime, /xterm-color-clear-cache/ should be called
+in a buffer with activated xterm-color for changes to take effect in that buffer.
 
 Example:
 
@@ -42,10 +42,6 @@ Example:
   (switch-to-buffer buffer))
 #+END_SRC
 
-If you are inserting into a buffer that has activated font locking, you
-*NO LONGER* need to set /font-lock-unfontify-region-function/ to
-/xterm-color-unfontify-region/ as the latter has been removed.
-
 You can replace ansi-color.el with xterm-color for all comint buffers,
 but this may create problems with modes that propertize strings and
 feed them through comint-preoutput-filter-functions since xterm-color-filter
@@ -56,7 +52,7 @@ comint-output-filter-functions and add xterm-color-filter as the *first*
 hook in the buffer-local comint-preoutput-filter-functions for any comint-based
 mode that you would like it to affect (e.g. shell-mode). Additionally, it is
 recommended to disable font-locking for shell-mode buffers
-[[https://github.com/atomontage/xterm-color/issues/28][since it seems to interact badly with comint and drastically affect performance]].
+[[https://github.com/atomontage/xterm-color/issues/28][since it interacts badly with comint and drastically affects performance]].
 Font locking in shell-mode buffers is superfluous since xterm-color.el will
 handle faces fine by itself.
 
@@ -77,7 +73,7 @@ An example configuration for shell-mode (M-x shell) is shown below:
 
 ;; Also set TERM accordingly (xterm-256color) in the shell itself.
 
-;; You can also use it with eshell (and thus get color output from system ls):
+;; An example configuration for eshell
 
 (require 'eshell) ; or use with-eval-after-load
 
@@ -93,9 +89,8 @@ An example configuration for shell-mode (M-x shell) is shown below:
 
 Using `compilation-shell-minor-mode' with shell-mode buffers that have xterm-color
 enabled is NOT recommended, as `compilation-shell-minor-mode' depends on font-locking
-and the latter introduces severe performance degradation. If you still want to use it,
-omit the statements that disable font-locking in the previously given shell-mode
-example configuration.
+and causes severe performance degradation. Omit the statements that disable font-locking
+in the previously given shell-mode example configuration if you need it.
 
 For standalone compilation buffers use the following configuration:
 
