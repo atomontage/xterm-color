@@ -7,6 +7,7 @@ xterm-color.el is an ANSI control sequence to text-property translator
 * Features
 + Regular ANSI color support
 + XTERM 256 color support
++ Truecolor (24-bit) color support
 + AIXTERM bright foreground color
 + AIXTERM bright background color (since 1.8)
 + Use bold instead of bright (since 1.8)
