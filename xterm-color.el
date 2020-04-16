@@ -1,4 +1,4 @@
-;;; xterm-color.el --- ANSI, XTERM 256, and Truecolor color support -*- lexical-binding: t -*-
+;;; xterm-color.el --- ANSI, XTERM 256 and Truecolor support -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 xristos@sdf.org
 ;; All rights reserved
@@ -40,6 +40,8 @@
 ;; * Regular ANSI colors
 ;;
 ;; * XTERM 256 colors
+;;
+;; * Truecolor (24-bit)
 ;;
 ;; * AIXTERM bright foreground color
 ;;
@@ -160,8 +162,8 @@
 ;; Supported SGR attributes: Look at `xterm-color--dispatch-SGR'.
 ;; SGR attribute 1 is rendered as bright unless `xterm-color-use-bold-for-bright'
 ;; is T which will, if current Emacs font has a bold variant, switch to bold.
-;; SGR attributes 38 and 48 are supported in both their 256 color and truecolor (24-bit)
-;; variants.
+;; SGR attributes 38 and 48 are supported in both their 256 color and truecolor
+;; (24-bit) variants.
 
 ;;; Test:
 ;;
@@ -298,9 +300,9 @@ inverse-color, frame, overline SGR state machine bits.")
 ;;; Internal API
 ;;;
 
-;; The face caching scheme requires an integer width of at least 56 bits to cache faces derived
-;; from truecolor (24-bit) ANSI sequences. Truecolor support is therefore disabled on e.g. machines
-;; with 32-bit integers.
+;; The face caching scheme requires an integer width of at least 56 bits
+;; to cache faces derived from truecolor (24-bit) ANSI sequences. Truecolor
+;; support is therefore disabled on e.g. machines with 32-bit integers.
 (defvar xterm-color--support-truecolor (>= most-positive-fixnum (1- (expt 2 56.0))))
 
 (cl-defun xterm-color--string-properties (string)
@@ -381,20 +383,21 @@ by using other functions."
   `(xterm-color--with-SGR-constants
      (cl-macrolet
          ;; The following macros should be used in rule bodies
-         ((set-a! (attr)
-                  `(setq xterm-color--attributes
-                         (logior xterm-color--attributes ,attr)))
-          (unset-a! (attr)
-                    `(setq xterm-color--attributes
-                           (logand xterm-color--attributes
-                                   (logand #xff (lognot ,attr)))))
+         ((set-a! (attr)   `(setq xterm-color--attributes
+                                  (logior xterm-color--attributes ,attr)))
+          (unset-a! (attr) `(setq xterm-color--attributes
+                                  (logand xterm-color--attributes
+                                          (logand #xff (lognot ,attr)))))
+
           (set-f! (fg-color) `(setq xterm-color--current-fg ,fg-color))
           (set-b! (bg-color) `(setq xterm-color--current-bg ,bg-color))
+
           (set-truecolor! (triplet current-color)
                              `(setq ,current-color
                                     (logior (ash (cl-first ,triplet) 16)
                                             (ash (cl-second ,triplet) 8)
-                                                 (cl-third ,triplet))))
+                                            (cl-third ,triplet))))
+
           (reset! ()         `(setq xterm-color--current-fg nil
                                     xterm-color--current-bg nil
                                     xterm-color--attributes 0)))
@@ -452,17 +455,18 @@ by using other functions."
     (:match (29) (unset-a! +strike-through+))
 
     (:match ((and (eq 38 (cl-first SGR-list))
-                  (eq 2 (cl-second SGR-list))           ; truecolor (24-bit) FG color
+                  (eq 2 (cl-second SGR-list))           ; Truecolor (24-bit) FG color
                   xterm-color--support-truecolor)
              'xterm-color--skip-truecolor)
             (set-a! +truecolor+)
             (set-truecolor! (cddr SGR-list) xterm-color--current-fg))
     (:match ((and (eq 48 (cl-first SGR-list))
-                  (eq 2 (cl-second SGR-list))           ; truecolor (24-bit) BG color
+                  (eq 2 (cl-second SGR-list))           ; Truecolor (24-bit) BG color
                   xterm-color--support-truecolor)
              'xterm-color--skip-truecolor)
             (set-a! +truecolor+)
             (set-truecolor! (cddr SGR-list) xterm-color--current-bg))
+
     (:match (38 'cl-cdddr)                              ; XTERM 256 FG color
             (set-f! (cl-third SGR-list)))
     (:match (48 'cl-cdddr)                              ; XTERM 256 BG color
@@ -538,73 +542,66 @@ in LIFO order."
 (defmacro xterm-color--with-ANSI-macro-helpers (&rest body)
   (declare (indent defun))
   `(xterm-color--with-SGR-constants
-     (cl-macrolet
-         ((out! (x)            `(push ,x result))
-          (push-char! (c)      `(push ,c xterm-color--char-list))
-          (push-csi! (c)       `(push ,c xterm-color--CSI-list))
+     (cl-symbol-macrolet ((fg           xterm-color--current-fg)
+                          (bg           xterm-color--current-bg)
+                          (attrs        xterm-color--attributes)
+                          (bold-bright  xterm-color-use-bold-for-bright))
+       (cl-macrolet
+           ((out! (x)            `(push ,x result))
+            (push-char! (c)      `(push ,c xterm-color--char-list))
+            (push-csi! (c)       `(push ,c xterm-color--CSI-list))
 
-          (state! (s)          `(setq state ,s))
-          (color? ()           `(or xterm-color--current-fg
-                                    xterm-color--current-bg
-                                    (/= xterm-color--attributes 0)))
-          (has? (attrib)       `(/= (logand ,attrib xterm-color--attributes) 0))
-          (face-cache-get ()   `(gethash (let ((fg (or xterm-color--current-fg 0))
-                                               (bg (or xterm-color--current-bg 0)))
+            (state! (s)          `(setq state ,s))
+            (color? ()           `(or fg bg (/= attrs 0)))
+            (has? (attr)         `(/= (logand ,attr attrs) 0))
+            (face-cache-get ()   `(gethash (if (has? +truecolor+)
+                                               (logior (ash attrs 48) (ash (or bg 0) 24) (or fg 0))
+                                             (logior (ash attrs 16) (ash (or bg 0) 8) (or fg 0)))
+                                           xterm-color--face-cache))
+            (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
+            (truecolor (color)   `(format "#%06x" ,color))
+            (256color  (color)   `(xterm-color-256 ,color))
+            (make-color-fg ()    `(if (and bold-bright (or (has? +bright+) (<= 8 fg 15)))
+                                      (progn (face! :weight 'bold)
+                                             (face! :foreground
+                                                    (if (has? +truecolor+)
+                                                        (truecolor fg)
+                                                      (256color (if (<= 8 fg) (- fg 8) fg)))))
+                                    (face! :foreground
                                            (if (has? +truecolor+)
-                                               (logior (ash xterm-color--attributes 48)
-                                                       (ash bg 24)
-                                                       fg)
-                                             (logior (ash xterm-color--attributes 16)
-                                                     (ash bg 8)
-                                                     fg)))
-                                         xterm-color--face-cache))
-          (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
-          (truecolor (color)   `(format "#%06x" ,color))
-          (make-face ()        `(or (face-cache-get)
-                                    (let (plistf)
-                                      (when (has? +italic+)         (face! :slant 'italic))
-                                      (when (has? +underline+)      (face! :underline t))
-                                      (when (has? +strike-through+) (face! :strike-through t))
-                                      (when (has? +negative+)       (face! :inverse-video t))
-                                      (when (has? +overline+)       (face! :overline t))
-                                      (when (has? +frame+)          (face! :box t))
-                                      (if xterm-color--current-fg
-                                          (if (and xterm-color-use-bold-for-bright
-                                                   (or (has? +bright+)
-                                                       (<= 8 xterm-color--current-fg 15)))
-                                              (progn (face! :weight 'bold)
-                                                     (face! :foreground
-                                                            (if (has? +truecolor+)
-                                                                (truecolor xterm-color--current-fg)
-                                                              (xterm-color-256 (if (<= 8 xterm-color--current-fg)
-                                                                                   (- xterm-color--current-fg 8)
-                                                                                 xterm-color--current-fg)))))
-                                            (face! :foreground
-                                                   (if (has? +truecolor+)
-                                                       (truecolor xterm-color--current-fg)
-                                                     (xterm-color-256
-                                                      (if (and (<= xterm-color--current-fg 7)
-                                                               (has? +bright+))
-                                                          (+ xterm-color--current-fg 8)
-                                                        xterm-color--current-fg)))))
-                                        (when (and xterm-color-use-bold-for-bright
-                                                   (has? +bright+))
-                                          (face! :weight 'bold)))
-                                      (when xterm-color--current-bg
-                                        (face! :background (if (has? +truecolor+)
-                                                               (truecolor xterm-color--current-bg)
-                                                             (xterm-color-256 xterm-color--current-bg))))
-                                      (setf (face-cache-get) plistf))))
-          (maybe-fontify ()    '(when xterm-color--char-list
-                                  (let ((s (concat (nreverse xterm-color--char-list))))
-                                    (when (color?)
-                                      (add-text-properties
-                                       0 (length s)
-                                       (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-face))
-                                       s))
-                                    (out! s))
-                                  (setq xterm-color--char-list nil))))
-       ,@body)))
+                                               (truecolor fg)
+                                             (256color (if (and (<= fg 7) (has? +bright+))
+                                                           (+ fg 8)
+                                                         fg))))))
+            (make-color-bg ()    `(face! :background (if (has? +truecolor+)
+                                                         (truecolor bg)
+                                                       (256color bg))))
+            (make-face ()        `(or (face-cache-get)
+                                      (let (plistf)
+                                        (when (has? +italic+)         (face! :slant 'italic))
+                                        (when (has? +underline+)      (face! :underline t))
+                                        (when (has? +strike-through+) (face! :strike-through t))
+                                        (when (has? +negative+)       (face! :inverse-video t))
+                                        (when (has? +overline+)       (face! :overline t))
+                                        (when (has? +frame+)          (face! :box t))
+
+                                        (if fg
+                                            (make-color-fg)
+                                          (when (and bold-bright (has? +bright+))
+                                            (face! :weight 'bold)))
+
+                                        (when bg (make-color-bg))
+                                        (setf (face-cache-get) plistf))))
+            (maybe-fontify ()    '(when xterm-color--char-list
+                                    (let ((s (concat (nreverse xterm-color--char-list))))
+                                      (when (color?)
+                                        (add-text-properties
+                                         0 (length s)
+                                         (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-face))
+                                         s))
+                                      (out! s))
+                                    (setq xterm-color--char-list nil))))
+         ,@body))))
 
 
 ;;;
@@ -753,7 +750,7 @@ effect when called from a buffer that does not have a cache."
   (interactive)
   (and xterm-color--face-cache
        (clrhash xterm-color--face-cache)
-       (message "Cleared xterm-color face attribute cache")))
+       (xterm-color--message "Cleared face attribute cache")))
 
 
 ;;;
@@ -867,29 +864,29 @@ effect when called from a buffer that does not have a cache."
 
 (defmacro xterm-color--test-truecolor ()
   `(cl-flet ((insert-truecolor-sequences
-             (rgb-fn)
-             (dolist (seq (list (number-sequence 0 127)
-                                (reverse (number-sequence 255 128))))
-               (dolist (i seq)
-                 (apply #'ansi-filter "\x1b[48;2;%s;%s;%sm \x1b[0m" (funcall rgb-fn i))))
-             (insert "\n"))
-            (rainbow-color
-             (i)
-             (let* ((h (/ i 43))
-                    (f (- i (* 43 h)))
-                    (t_ (/ (* 255 f) 43))
-                    (q (- 255 t_)))
-               (cl-case h
-                 (0 `(255 ,t_ 0))
-                 (1 `(,q 255 0))
-                 (2 `(0 255 ,t_))
-                 (3 `(0 ,q 255))
-                 (4 `(,t_ 0 255))
-                 (5 `(255 0 ,q))))))
-    (insert-truecolor-sequences (lambda (i) `(,i 0 0)))
-    (insert-truecolor-sequences (lambda (i) `(0 ,i 0)))
-    (insert-truecolor-sequences (lambda (i) `(0 0 ,i)))
-    (insert-truecolor-sequences #'rainbow-color)))
+              (rgb-fn)
+              (dolist (seq (list (number-sequence 0 127)
+                                 (reverse (number-sequence 255 128))))
+                (dolist (i seq)
+                  (apply #'ansi-filter "\x1b[48;2;%s;%s;%sm \x1b[0m" (funcall rgb-fn i))))
+              (insert "\n"))
+             (rainbow-color
+              (i)
+              (let* ((h (/ i 43))
+                     (f (- i (* 43 h)))
+                     (t_ (/ (* 255 f) 43))
+                     (q (- 255 t_)))
+                (cl-case h
+                  (0 `(255 ,t_ 0))
+                  (1 `(,q 255 0))
+                  (2 `(0 255 ,t_))
+                  (3 `(0 ,q 255))
+                  (4 `(,t_ 0 255))
+                  (5 `(255 0 ,q))))))
+     (insert-truecolor-sequences (lambda (i) `(,i 0 0)))
+     (insert-truecolor-sequences (lambda (i) `(0 ,i 0)))
+     (insert-truecolor-sequences (lambda (i) `(0 0 ,i)))
+     (insert-truecolor-sequences #'rainbow-color)))
 
 (defun xterm-color--test-xterm ()
   (xterm-color--with-tests
