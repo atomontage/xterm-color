@@ -369,16 +369,15 @@ ATTRIB should be a symbol that will be bound to SGR-LIST attributes in BODY.
 SGR-LIST should be a list of SGR attributes (integers) in LIFO order.
 BODY should contain rules with each rule being a list of form:
 
- (:match (condition &optional skip) rule-body-form..)
+ (:match (condition &key (skip 1)) rule-body-form..)
 
 CONDITION should be a Lisp form which will be evaluated as part of a COND
 condition clause. If it is an atom, it will be rewritten to (= CONDITION ATTRIB).
 Otherwise it will be used as is. As per COND statement, if CONDITION evaluates
 to T, rule body forms will be evaluated as part of the body of the COND clause.
-SKIP, if given, should be a function that will be used to iterate over SGR-LIST,
-by returning a list that the next iteration will use. CDR will be used by default,
-going down the SGR-LIST one element at a time. It is possible to skip elements
-by using other functions."
+SKIP, if given, should be an integer specifying the number of elements that should
+be skipped before the next iteration. The default is 1, going down SGR-LIST
+one element at a time."
   (declare (indent defun))
   `(xterm-color--with-SGR-constants
      (cl-macrolet
@@ -406,31 +405,24 @@ by using other functions."
         while ,SGR-list do
         (cond
          ,@(cl-loop
-            for skip = nil
+            for skip = 1
             for (tag (c . rest) . rule-body) in body
             when (not (eq tag :match)) do
             (error "Rule (%s (%s..)..) does not start with :match" tag c)
             when rest do
-            (setq skip (car rest))
-            (and (cdr rest) (error "Rule (%s (%s..)..) has malformed arguments: %s" tag c rest))
+            (setq skip (plist-get rest :skip))
+            (when (or (null skip) (cddr rest))
+              (error "Rule (%s (%s..)..) has malformed arguments: %s" tag c rest))
             ;; Condition part of COND
             collect `(,(if (atom c) `(= ,c ,attrib) c)
                       ;; Body of COND
                       ,@rule-body
-                      ;; Last expression in body of COND determines how
-                      ;; many SGR attributes will be skipped. If a skip
-                      ;; argument is passed to the rule, it will be funcalled
-                      ;; and passed SGR-list. Otherwise CDR will be used
-                      ;; to skip to the next SGR attribute.
-                      (setq ,SGR-list ,(if skip
-                                           `(funcall ,skip ,SGR-list)
-                                         `(cdr ,SGR-list)))))
+                      (setq ,SGR-list
+                            ,(if (> skip 1)
+                                 `(nthcdr ,skip ,SGR-list)
+                               `(cdr ,SGR-list)))))
          (t (xterm-color--message "Not implemented SGR attribute %s" ,attrib)
             (setq ,SGR-list (cdr ,SGR-list))))))))
-
-
-(defsubst xterm-color--skip-truecolor (SGR-list)
-  (nthcdr 5 SGR-list))
 
 (defsubst xterm-color--dispatch-SGR (SGR-list)
   "Update state machine based on SGR-LIST which should be a list of SGR attributes (integers)."
@@ -457,19 +449,25 @@ by using other functions."
     (:match ((and (eq 38 (cl-first SGR-list))
                   (eq 2 (cl-second SGR-list))           ; Truecolor (24-bit) FG color
                   xterm-color--support-truecolor)
-             'xterm-color--skip-truecolor)
+             :skip 5)
             (set-a! +truecolor+)
-            (set-truecolor! (cddr SGR-list) xterm-color--current-fg))
+            (set-truecolor! (cddr SGR-list)
+                            xterm-color--current-fg))
     (:match ((and (eq 48 (cl-first SGR-list))
                   (eq 2 (cl-second SGR-list))           ; Truecolor (24-bit) BG color
                   xterm-color--support-truecolor)
-             'xterm-color--skip-truecolor)
+             :skip 5)
             (set-a! +truecolor+)
-            (set-truecolor! (cddr SGR-list) xterm-color--current-bg))
+            (set-truecolor! (cddr SGR-list)
+                            xterm-color--current-bg))
 
-    (:match (38 'cl-cdddr)                              ; XTERM 256 FG color
+    (:match ((and (eq 38 (cl-first SGR-list))
+                  (eq 5 (cl-second SGR-list)))
+             :skip 3)                                   ; XTERM 256 FG color
             (set-f! (cl-third SGR-list)))
-    (:match (48 'cl-cdddr)                              ; XTERM 256 BG color
+    (:match ((and (eq 48 (cl-first SGR-list))
+                  (eq 5 (cl-second SGR-list)))
+             :skip 3)                                   ; XTERM 256 BG color
             (set-b! (cl-third SGR-list)))
 
     (:match (51) (set-a!   +frame+))
