@@ -244,9 +244,8 @@
 
 (defvar xterm-color-preserve-properties nil
   "If T, preserve existing text properties on input about to be filtered.
-This should be NIL most of the time as it can mess up the internal state
-machine if it encounters ANSI data with text properties applied. It is
-really meant for and works ok with eshell.")
+This should be NIL most of the time. It is really meant for and works
+ok with eshell.")
 
 (make-variable-buffer-local 'xterm-color-preserve-properties)
 
@@ -447,28 +446,35 @@ one element at a time."
     (:match (29) (unset-a! +strike-through+))
 
     (:match ((and (eq 38 (cl-first SGR-list))
-                  (eq 2 (cl-second SGR-list))           ; Truecolor (24-bit) FG color
-                  xterm-color--support-truecolor)
+                  (eq 2 (cl-second SGR-list)))          ; Truecolor (24-bit) FG color
              :skip 5)
-            (set-a! +truecolor+)
-            (set-truecolor! (cddr SGR-list)
-                            xterm-color--current-fg))
+            (when xterm-color--support-truecolor
+              (set-a! +truecolor+)
+              (set-truecolor! (cddr SGR-list)
+                              xterm-color--current-fg)))
+
     (:match ((and (eq 48 (cl-first SGR-list))
-                  (eq 2 (cl-second SGR-list))           ; Truecolor (24-bit) BG color
-                  xterm-color--support-truecolor)
+                  (eq 2 (cl-second SGR-list)))          ; Truecolor (24-bit) BG color
              :skip 5)
-            (set-a! +truecolor+)
-            (set-truecolor! (cddr SGR-list)
-                            xterm-color--current-bg))
+            (when xterm-color--support-truecolor
+              (set-a! +truecolor+)
+              (set-truecolor! (cddr SGR-list)
+                              xterm-color--current-bg)))
 
     (:match ((and (eq 38 (cl-first SGR-list))
                   (eq 5 (cl-second SGR-list)))
              :skip 3)                                   ; XTERM 256 FG color
-            (set-f! (cl-third SGR-list)))
+            (let ((color (cl-third SGR-list)))
+              (if (> color 255)
+                  (xterm-color--message "SGR 38;5;%s exceeds range" color)
+                (set-f! color))))
     (:match ((and (eq 48 (cl-first SGR-list))
                   (eq 5 (cl-second SGR-list)))
              :skip 3)                                   ; XTERM 256 BG color
-            (set-b! (cl-third SGR-list)))
+            (let ((color (cl-third SGR-list)))
+              (if (> color 255)
+                  (xterm-color--message "SGR 48;5;%s exceeds range" color)
+                (set-b! color))))
 
     (:match (51) (set-a!   +frame+))
     (:match (53) (set-a!   +overline+))
