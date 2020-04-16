@@ -474,8 +474,8 @@ by using other functions."
 
     (:match (51) (set-a!   +frame+))
     (:match (53) (set-a!   +overline+))
-    (:match (54) (set-a!   +frame+))
-    (:match (55) (set-a!   +overline+))
+    (:match (54) (unset-a! +frame+))
+    (:match (55) (unset-a! +overline+))
     (:match ((<= 90 elem 97))                           ; AIXTERM hi-intensity FG
             ;; Rather than setting bright, which would be wrong,
             ;; rescale color to fall within 8-15 so that it gets
@@ -616,7 +616,8 @@ Return new STRING with text properties applied.
 
 This function strips text properties that may be present in STRING."
   (or xterm-color--face-cache
-      (setq xterm-color--face-cache (make-hash-table :weakness 'value)))
+      (setq xterm-color--face-cache
+            (make-hash-table :weakness 'value)))
   (xterm-color--with-ANSI-macro-helpers
     (cl-loop
      with state = xterm-color--state and result
