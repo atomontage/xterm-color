@@ -742,6 +742,21 @@ prefix arg causes overlays to be used."
     (when read-only-p (read-only-mode 1))))
 
 ;;;###autoload
+(defun xterm-color-apply-on-region (beg end &optional use-overlays)
+  "Apply `xterm-color-filter' to current region.
+
+When called non-interactively, apply to region bounded by buffer
+positions BEG and END. See `xterm-color-colorize-buffer' for the
+meaning of USE-OVERLAYS."
+  (interactive "r")
+  (let ((pos (point)))
+    (save-restriction
+      (narrow-to-region beg end)
+      (let ((buffer-read-only nil))
+        (xterm-color-colorize-buffer use-overlays)))
+    (goto-char pos)))
+
+;;;###autoload
 (defun xterm-color-clear-cache ()
   "Clear xterm color face attribute cache.
 You may want to call this if you change `xterm-color-names' or
