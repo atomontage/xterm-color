@@ -287,6 +287,11 @@ inverse-color, frame, overline SGR state machine bits.")
 
 (make-variable-buffer-local 'xterm-color--face-cache)
 
+(defvar xterm-color--truecolor-face-cache nil
+  "Cache for auto-generated face attributes.")
+
+(make-variable-buffer-local 'xterm-color--truecolor-face-cache)
+
 
 ;;;
 ;;; Constants
@@ -356,8 +361,7 @@ inverse-color, frame, overline SGR state machine bits.")
         (+strike-through+   8)
         (+negative+        16)
         (+frame+           32)
-        (+overline+        64)
-        (+truecolor+      128))
+        (+overline+        64))
      ,@body))
 
 (cl-defmacro xterm-color--create-SGR-table ((attrib SGR-list) &body body)
@@ -392,12 +396,21 @@ one element at a time."
           (set-b! (bg-color) `(setq xterm-color--current-bg ,bg-color))
 
           (set-truecolor! (r g b current-color)
-                             `(setq ,current-color
-                                    (logior (ash r 16) (ash g 8) b)))
+                          ;; We want a single integer to be able to
+                          ;; hold and distinguish between:
+                          ;;
+                          ;; - 24bit truecolor values
+                          ;; - ANSI colors
+                          ;; - XTerm 256 colors
+                          ;;
+                          ;; The following packing scheme achieves that.
+                          `(setq ,current-color
+                                 (logior (ash r 25) (ash g 17) (ash b 9)
+                                         #x100)))
 
-          (reset! ()         `(setq xterm-color--current-fg nil
-                                    xterm-color--current-bg nil
-                                    xterm-color--attributes 0)))
+          (reset! ()      `(setq xterm-color--current-fg nil
+                                 xterm-color--current-bg nil
+                                 xterm-color--attributes 0)))
        (cl-loop
         for ,attrib = (cl-first ,SGR-list)
         while ,SGR-list do
@@ -454,7 +467,6 @@ one element at a time."
                   (if (or (> r 255) (> g 255) (> b 255))
                       (xterm-color--message "SGR 38;2;%s;%s;%s exceeds range"
                                             r g b)
-                    (set-a! +truecolor+)
                     (set-truecolor! r g b xterm-color--current-fg))
                 (xterm-color--message "SGR 38;2;%s;%s;%s error, expected 38;2;R;G;B"
                                       r g b))))
@@ -469,7 +481,6 @@ one element at a time."
                 (if (or (> r 255) (> g 255) (> b 255))
                     (xterm-color--message "SGR 48;2;%s;%s;%s exceeds range"
                                           r g b)
-                  (set-a! +truecolor+)
                   (set-truecolor! r g b xterm-color--current-bg))
                 (xterm-color--message "SGR 48;2;%s;%s;%s error, expected 48;2;R;G;B"
                                       r g b))))
@@ -573,28 +584,36 @@ in LIFO order."
             (push-csi! (c)       `(push ,c xterm-color--CSI-list))
 
             (state! (s)          `(setq state ,s))
-            (color? ()           `(or fg bg (/= attrs 0)))
+            (graphics? ()        `(or fg bg (/= attrs 0)))
             (has? (attr)         `(/= (logand ,attr attrs) 0))
-            (face-cache-get ()   `(gethash (if (has? +truecolor+)
-                                               (logior (ash attrs 48) (ash (or bg 0) 24) (or fg 0))
-                                             (logior (ash attrs 16) (ash (or bg 0) 8) (or fg 0)))
-                                           xterm-color--face-cache))
-            (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
-            (truecolor (color)   `(format "#%06x" ,color))
+            (unpack (color)      `(ash ,color -9))
+            (truecolor (color)   `(format "#%06x" (unpack ,color)))
             (256color  (color)   `(xterm-color-256 ,color))
-            (make-color-fg ()    `(if (and bold-bright (or (has? +bright+) (<= 8 fg 15)))
+            (face-cache-get ()   `(let ((f (or fg 0))
+                                        (b (or bg 0)))
+                                    (if (and (< f 256) (< b 256))
+                                        ;; Not truecolor
+                                        (gethash (logior (ash attrs 16) (ash b 8) f)
+                                                 xterm-color--face-cache)
+                                      ;; Truecolor
+                                      (gethash (logior (ash attrs 48)
+                                                       (ash (unpack b) 24)
+                                                       (unpack f))
+                                               xterm-color--truecolor-face-cache))))
+            (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
+            (make-color-fg ()    `(if (and bold-bright
+                                           (< fg 256)
+                                           (or (has? +bright+) (<= 8 fg 15)))
                                       (progn (face! :weight 'bold)
                                              (face! :foreground
-                                                    (if (has? +truecolor+)
-                                                        (truecolor fg)
-                                                      (256color (if (<= 8 fg) (- fg 8) fg)))))
+                                                    (256color (if (<= 8 fg) (- fg 8) fg))))
                                     (face! :foreground
-                                           (if (has? +truecolor+)
+                                           (if (> fg 255)
                                                (truecolor fg)
                                              (256color (if (and (<= fg 7) (has? +bright+))
                                                            (+ fg 8)
                                                          fg))))))
-            (make-color-bg ()    `(face! :background (if (has? +truecolor+)
+            (make-color-bg ()    `(face! :background (if (> bg 255)
                                                          (truecolor bg)
                                                        (256color bg))))
             (make-face ()        `(or (face-cache-get)
@@ -615,10 +634,13 @@ in LIFO order."
                                         (setf (face-cache-get) plistf))))
             (maybe-fontify ()    '(when xterm-color--char-list
                                     (let ((s (concat (nreverse xterm-color--char-list))))
-                                      (when (color?)
+                                      (when (graphics?)
                                         (add-text-properties
                                          0 (length s)
-                                         (list 'xterm-color t (if font-lock-mode 'font-lock-face 'face) (make-face))
+                                         (list 'xterm-color t (if font-lock-mode
+                                                                  'font-lock-face
+                                                                'face)
+                                               (make-face))
                                          s))
                                       (out! s))
                                     (setq xterm-color--char-list nil))))
@@ -636,9 +658,12 @@ in LIFO order."
 Return new STRING with text properties applied.
 
 This function strips text properties that may be present in STRING."
-  (or xterm-color--face-cache
-      (setq xterm-color--face-cache
-            (make-hash-table :weakness 'value)))
+  (unless xterm-color--face-cache
+    (setq xterm-color--face-cache
+          (make-hash-table :weakness 'value)))
+  (unless xterm-color--truecolor-face-cache
+    (setq xterm-color--truecolor-face-cache
+          (make-hash-table :weakness 'value)))
   (xterm-color--with-ANSI-macro-helpers
     (cl-loop
      with state = xterm-color--state and result
@@ -650,7 +675,7 @@ This function strips text properties that may be present in STRING."
           (maybe-fontify)
           (state! :ansi-esc))
          (t
-          (if (color?)
+          (if (graphics?)
               (push-char! char)
             (out! (string char))))))
        (:ansi-esc
@@ -772,7 +797,10 @@ effect when called from a buffer that does not have a cache."
   (interactive)
   (and xterm-color--face-cache
        (clrhash xterm-color--face-cache)
-       (xterm-color--message "Cleared face attribute cache")))
+       (xterm-color--message "Cleared face attribute cache"))
+  (and xterm-color--truecolor-face-cache
+       (clrhash xterm-color--truecolor-face-cache)
+       (xterm-color--message "Cleared truecolor face attribute cache")))
 
 
 ;;;
