@@ -582,64 +582,101 @@ in LIFO order."
            ((out! (x)            `(push ,x result))
             (push-char! (c)      `(push ,c xterm-color--char-list))
             (push-csi! (c)       `(push ,c xterm-color--CSI-list))
-
             (state! (s)          `(setq state ,s))
             (graphics? ()        `(or fg bg (/= attrs 0)))
             (has? (attr)         `(/= (logand ,attr attrs) 0))
+            (fmt-24bit (color)   `(format "#%06x" ,color))
+            (fmt-256 (color)     `(xterm-color-256 ,color))
+
+            ;; Unpacks a packed truecolor value (as stored in
+            ;; `xterm-color--current-fg' and `xterm-color--current-fg'.
             (unpack (color)      `(ash ,color -9))
-            (truecolor (color)   `(format "#%06x" (unpack ,color)))
-            (256color  (color)   `(xterm-color-256 ,color))
-            (face-cache-get ()   `(let ((f (or fg 0))
-                                        (b (or bg 0)))
-                                    (if (and (< f 256) (< b 256))
-                                        ;; Not truecolor
-                                        (gethash (logior (ash attrs 16) (ash b 8) f)
-                                                 xterm-color--face-cache)
-                                      ;; Truecolor
-                                      (gethash (logior (ash attrs 48)
-                                                       (ash (unpack b) 24)
-                                                       (unpack f))
-                                               xterm-color--truecolor-face-cache))))
+
+            ;; To avoid hash collisions, a different packing scheme is used
+            ;; for hash table keys. It can encode two colors (foreground
+            ;; and background) that can either be truecolor 24bit or XTerm 256
+            ;; color 8bit. XTerm 256 color values subsume ANSI colors, a
+            ;; separate encoding scheme for these is not needed.
+            ;;
+            ;; The scheme used also accounts for the combination of a truecolor
+            ;; with an XTerm 256 color as part of the same hashed entry. Since
+            ;; two different hash tables are used to work around 32bit Emacs
+            ;; limited integer range, two packing schemes are actually used:
+            ;;
+            ;; High<         25 bits       >Low
+            ;; ATTR[7 bits]BG[9 bits]FG[9 bits] where BG and FG are each
+            ;; encoded as the 8bit color value shifted left by 1 and combined
+            ;; with a flag bit which is set when the color is present.
+            ;;
+            ;; High<         59 bits         >Low
+            ;; ATTR[7 bits]BG[26 bits]FG[26 bits] where BG and FG are each
+            ;; encoded as the 24bit (RGB) or 8bit color value shifted left by
+            ;; 2 and combined with 2 flag bits that are set when the value
+            ;; is 24bit (high bit) and when the color is present (low bit).
+            (pack-256 (color)    `(if ,color (logior (ash ,color 1) 1) 0))
+            (pack-24bit (color)  `(if ,color
+                                      (if (> ,color 255)
+                                          (logior (ash (unpack ,color) 2) 3)
+                                        (logior (ash ,color 2) 1))
+                                    0))
+            ;; If at least one of foreground / background color is a 24bit
+            ;; truecolor value: Second packing scheme with
+            ;; `xterm-color--truecolor-face-cache' is used.
+            ;;
+            ;; Every other case, including when no colors are present:
+            ;; First packing scheme with `xterm-color--face-cache' is used.
+            (pack-key-into (k)   `(cond ((or (and fg (> fg 255))
+                                             (and bg (> bg 255)))
+                                         ;; At least one truecolor 24bit value
+                                         (setq ,k (logior (ash attrs 52)
+                                                          (ash (pack-24bit bg) 26)
+                                                          (pack-24bit fg)))
+                                         xterm-color--truecolor-face-cache)
+                                        (t ;; No truecolor 24bit value
+                                         (setq ,k (logior (ash attrs 18)
+                                                          (ash (pack-256 bg) 9)
+                                                          (pack-256 fg)))
+                                         xterm-color--face-cache)))
+
             (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
             (make-color-fg ()    `(if (and bold-bright
                                            (< fg 256)
                                            (or (has? +bright+) (<= 8 fg 15)))
                                       (progn (face! :weight 'bold)
                                              (face! :foreground
-                                                    (256color (if (<= 8 fg) (- fg 8) fg))))
+                                                    (fmt-256 (if (<= 8 fg) (- fg 8) fg))))
                                     (face! :foreground
                                            (if (> fg 255)
-                                               (truecolor fg)
-                                             (256color (if (and (<= fg 7) (has? +bright+))
-                                                           (+ fg 8)
-                                                         fg))))))
-            (make-color-bg ()    `(face! :background (if (> bg 255)
-                                                         (truecolor bg)
-                                                       (256color bg))))
-            (make-face ()        `(or (face-cache-get)
-                                      (let (plistf)
-                                        (when (has? +italic+)         (face! :slant 'italic))
-                                        (when (has? +underline+)      (face! :underline t))
-                                        (when (has? +strike-through+) (face! :strike-through t))
-                                        (when (has? +negative+)       (face! :inverse-video t))
-                                        (when (has? +overline+)       (face! :overline t))
-                                        (when (has? +frame+)          (face! :box t))
+                                               (fmt-24bit (unpack fg))
+                                             (fmt-256 (if (and (<= fg 7) (has? +bright+))
+                                                             (+ fg 8)
+                                                           fg))))))
+            (make-color-bg ()    `(face! :background (cond ((> bg 255) (fmt-24bit (unpack bg)))
+                                                           (t (fmt-256 bg)))))
+            (make-face ()        `(let* (k
+                                         (table (pack-key-into k)))
+                                    (or (gethash k table)
+                                        (let (plistf)
+                                          (when (has? +italic+)         (face! :slant 'italic))
+                                          (when (has? +underline+)      (face! :underline t))
+                                          (when (has? +strike-through+) (face! :strike-through t))
+                                          (when (has? +negative+)       (face! :inverse-video t))
+                                          (when (has? +overline+)       (face! :overline t))
+                                          (when (has? +frame+)          (face! :box t))
 
-                                        (if fg
-                                            (make-color-fg)
-                                          (when (and bold-bright (has? +bright+))
-                                            (face! :weight 'bold)))
+                                          (cond (fg (make-color-fg))
+                                                (t (when (and bold-bright (has? +bright+))
+                                                     (face! :weight 'bold))))
 
-                                        (when bg (make-color-bg))
-                                        (setf (face-cache-get) plistf))))
+                                          (when bg (make-color-bg))
+                                          (setf (gethash k table) plistf)))))
             (maybe-fontify ()    '(when xterm-color--char-list
                                     (let ((s (concat (nreverse xterm-color--char-list))))
                                       (when (graphics?)
                                         (add-text-properties
                                          0 (length s)
-                                         (list 'xterm-color t (if font-lock-mode
-                                                                  'font-lock-face
-                                                                'face)
+                                         (list 'xterm-color t
+                                               (if font-lock-mode 'font-lock-face 'face)
                                                (make-face))
                                          s))
                                       (out! s))
