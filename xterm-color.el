@@ -308,7 +308,8 @@ inverse-color, frame, overline SGR state machine bits.")
 ;; The face caching scheme requires an integer width of at least 56 bits
 ;; to cache faces derived from truecolor (24-bit) ANSI sequences. Truecolor
 ;; support is therefore disabled on e.g. machines with 32-bit integers.
-(defvar xterm-color--support-truecolor (>= most-positive-fixnum (1- (expt 2 56.0))))
+(defvar xterm-color--support-truecolor (>= (1+ (floor (log most-positive-fixnum 2)))
+                                           59))
 
 (cl-defun xterm-color--string-properties (string)
   (cl-loop
