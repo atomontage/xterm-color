@@ -161,7 +161,7 @@
 ;;
 ;; Supported SGR attributes: Look at `xterm-color--dispatch-SGR'.
 ;; SGR attribute 1 is rendered as bright unless `xterm-color-use-bold-for-bright'
-;; is T which will, if current Emacs font has a bold variant, switch to bold.
+;; is T which will, if current font has a bold variant, switch to bold.
 ;; SGR attributes 38 and 48 are supported in both their 256 color and truecolor
 ;; (24-bit) variants.
 
@@ -805,12 +805,12 @@ This can be inserted into `comint-preoutput-filter-functions'."
 (cl-defun xterm-color-colorize-buffer (&optional use-overlays)
   "Apply `xterm-color-filter' to current buffer, and replace its contents.
 
-The colors will be applied using 'font-lock-face, unless
-font-lock-mode is inactive, in which case 'face will be used.
+Colors will be applied using 'face, unless font-lock-mode is active, in
+which case 'font-lock-face will be used. Operation with font-lock mode
+active is not recommended.
 
-If USE-OVERLAYS is non-nil then the colors will be applied to
-the buffer using overlays instead of text properties. A C-u
-prefix arg causes overlays to be used."
+If USE-OVERLAYS is non-nil then colors will be applied to the buffer using
+overlays instead of text properties. A C-u prefix arg causes overlays to be used."
   (interactive "P")
   (let ((read-only-p buffer-read-only))
     (when read-only-p
@@ -888,7 +888,7 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (default colors)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+         (insert "  Expect: Bold instead of bright")
        (insert "  Expect: Bright not to be rendered since no foreground color is set"))
      (insert "\n\n")
 
@@ -899,7 +899,7 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (blue foreground)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+         (insert "  Expect: Bold instead of bright")
        (insert "  Expect: Bright rendered as bright color"))
      (insert "\n\n")
 
@@ -910,7 +910,7 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (blue background)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+         (insert "  Expect: Bold instead of bright")
        (insert "  Expect: Bright not to be rendered since no foreground color is set"))
      (insert "\n\n")
 
@@ -921,7 +921,7 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (AIXTERM blue foreground)\n")
 
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant")
+         (insert "  Expect: Bold instead of bright")
        (insert "  Expect: Bright color everywhere due to AIXTERM"))
      (insert "\n\n")
 
@@ -932,7 +932,7 @@ effect when called from a buffer that does not have a cache."
      (insert "* ANSI attributes (AIXTERM red background)\n")
      (insert "  Expect: Bright background color due to AIXTERM\n")
      (if xterm-color-use-bold-for-bright
-         (insert "  Expect: Bold instead of bright for foreground, if current Emacs font has bold variant\n\n")
+         (insert "  Expect: Bold instead of bright for foreground\n\n")
        (insert "\n"))
 
      (cl-loop for (attrib . name) in test-attributes
@@ -942,39 +942,15 @@ effect when called from a buffer that does not have a cache."
      (insert "* Misc\n")
      (if xterm-color-use-bold-for-bright
          (progn
-           (insert "  Expect: Bold instead of bright, if current Emacs font has bold variant\n")
+           (insert "  Expect: Bold instead of bright\n")
            (insert "          Otherwise bright rendered as normal intensity\n\n"))
        (insert "\n"))
 
-     (ansi-filter "Default \x1b[34;1mBright blue\x1b[39m Reset-fg-color \x1b[34mBlue (should be bright)\x1b[0m\t --[ Resetting FG color should not affect other SGR bits\n")
-     (ansi-filter "Default \x1b[94mBright blue\x1b[34m Switch-to-blue (should be normal intensity)\x1b[0m\t --[ AIXTERM bright color should not set bright SGR bit\n")
+     (insert "; Resetting FG color should not affect other SGR bits\n")
+     (ansi-filter "Default \x1b[34;1mBright blue\x1b[39m Reset-fg-color \x1b[34mBlue (bright)\x1b[0m\n\n")
+     (insert "; AIXTERM bright color should not set bright SGR bit\n")
+     (ansi-filter "Default \x1b[94mBright blue\x1b[34m Switch-to-blue (normal)\x1b[0m\n")
      (insert "\n"))))
-
-(defmacro xterm-color--test-truecolor ()
-  `(cl-flet ((insert-truecolor-sequences
-              (rgb-fn)
-              (dolist (seq (list (number-sequence 0 127)
-                                 (reverse (number-sequence 255 128))))
-                (dolist (i seq)
-                  (apply #'ansi-filter "\x1b[48;2;%s;%s;%sm \x1b[0m" (funcall rgb-fn i))))
-              (insert "\n"))
-             (rainbow-color
-              (i)
-              (let* ((h (/ i 43))
-                     (f (- i (* 43 h)))
-                     (t_ (/ (* 255 f) 43))
-                     (q (- 255 t_)))
-                (cl-case h
-                  (0 `(255 ,t_ 0))
-                  (1 `(,q 255 0))
-                  (2 `(0 255 ,t_))
-                  (3 `(0 ,q 255))
-                  (4 `(,t_ 0 255))
-                  (5 `(255 0 ,q))))))
-     (insert-truecolor-sequences (lambda (i) `(,i 0 0)))
-     (insert-truecolor-sequences (lambda (i) `(0 ,i 0)))
-     (insert-truecolor-sequences (lambda (i) `(0 0 ,i)))
-     (insert-truecolor-sequences #'rainbow-color)))
 
 (defun xterm-color--test-xterm ()
   (xterm-color--with-tests
@@ -1006,10 +982,19 @@ effect when called from a buffer that does not have a cache."
 
    ;; Truecolor color ramps
    (insert "\n")
-   (insert "*  Truecolor color ramps\n\n")
-   (xterm-color--test-truecolor)
+   (insert "*  Truecolor\n\n")
 
-   (insert "\n")
+   ;; Adapted from: https://gist.github.com/XVilka/8346728
+   (cl-loop
+    with steps = 77
+    for c from 0 below steps
+    for r = (- 255 (* c (/ 255 steps)))
+    for g = (* c (/ 510 steps))
+    for b = (* c (/ 255 steps)) do
+    (when (> g 255) (setq g (- 510 g)))
+    (ansi-filter "\x1b[48;2;%s;%s;%sm \x1b[m" r g b))
+
+   (insert "\n\n")
    (insert "*  XTERM color grayscale ramp\n\n")
 
    (cl-loop for color from 232 to 255
@@ -1031,7 +1016,7 @@ effect when called from a buffer that does not have a cache."
   (xterm-color-clear-cache)
 
   (insert "; Temporarily setting `xterm-color-use-bold-for-bright' to T\n")
-  (insert "; Current Emacs font needs to have a bold variant\n\n")
+  (insert "; Current font needs to have a bold variant for following tests\n\n")
 
   (let ((xterm-color-use-bold-for-bright t))
     (xterm-color--test-ansi))
