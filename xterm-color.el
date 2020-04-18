@@ -535,19 +535,18 @@ Given (59) return (0)
 Given (48 49 50) return (210)
 Given (48 49 50 59 50 50 59 48 49) return (10 22 210)"
   (cl-loop
-   with mul = 1 and num = 0 and ret
-   for c    = (car list) while c do
+   with mul = 1 and n = 0 and ret
+   for c in list do
    (if (/= 59 c)
        (let ((e (- c 48)))
          (unless (<= 0 e 9)
            (xterm-color--message "Invalid SGR attribute %s" c)
            (cl-return nil))
-         (cl-incf num (* mul e))
+         (cl-incf n (* mul e))
          (setq mul (* mul 10)))
-     (push num ret)
-     (setq num 0 mul 1))
-   (setq list (cdr list))
-   finally return (push num ret)))
+     (push n ret)
+     (setq n 0 mul 1))
+   finally return (push n ret)))
 
 
 ;;;
@@ -983,16 +982,18 @@ effect when called from a buffer that does not have a cache."
    ;; Truecolor color ramps
    (insert "\n")
    (insert "*  Truecolor\n\n")
-
-   ;; Adapted from: https://gist.github.com/XVilka/8346728
-   (cl-loop
-    with steps = 77
-    for c from 0 below steps
-    for r = (- 255 (* c (/ 255 steps)))
-    for g = (* c (/ 510 steps))
-    for b = (* c (/ 255 steps)) do
-    (when (> g 255) (setq g (- 510 g)))
-    (ansi-filter "\x1b[48;2;%s;%s;%sm \x1b[m" r g b))
+   (cond (xterm-color--support-truecolor
+          ;; Adapted from: https://gist.github.com/XVilka/8346728
+          (cl-loop
+           with steps = 77
+           for c from 0 below steps
+           for r = (- 255 (* c (/ 255 steps)))
+           for g = (* c (/ 510 steps))
+           for b = (* c (/ 255 steps)) do
+           (when (> g 255) (setq g (- 510 g)))
+           (ansi-filter "\x1b[48;2;%s;%s;%sm \x1b[m" r g b)))
+         (t
+          (insert "Truecolor is not supported on Emacs 32bit")))
 
    (insert "\n\n")
    (insert "*  XTERM color grayscale ramp\n\n")
