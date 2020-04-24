@@ -499,7 +499,7 @@ in LIFO order."
             ;; encoded as the 8bit color value shifted left by 1 and combined
             ;; with a flag bit which is set when the color is present.
             ;;
-            ;; High<         59 bits         >Low
+            ;; High<         59 bits       >Low
             ;; ATTR[7 bits]BG[26 bits]FG[26 bits] where BG and FG are each
             ;; encoded as the 24bit (RGB) or 8bit color value shifted left by
             ;; 2 and combined with 2 flag bits that are set when the value
