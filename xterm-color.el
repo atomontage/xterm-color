@@ -1,7 +1,7 @@
 ;;; xterm-color.el --- ANSI, XTERM 256 and Truecolor support -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 xristos@sdf.org
-;; All rights reserved
+;; All rights reserved.
 
 ;; Version: 1.9 - 2019-08-15
 ;; Author: xristos <xristos@sdf.org>
@@ -21,134 +21,25 @@
 ;;     disclaimer in the documentation and/or other materials
 ;;     provided with the distribution.
 ;;
-;; THIS SOFTWARE IS PROVIDED BY THE AUTHOR 'AS IS' AND ANY EXPRESSED
-;; OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-;; WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-;; ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-;; DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-;; DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-;; GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-;; WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-;; NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+;; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+;; POSSIBILITY OF SUCH DAMAGE.
+;;
 ;;; Commentary:
 ;;
-;; Translate ANSI control sequences into text properties.
+;; Translate ANSI control sequences into text properties through state machine
+;; emulation. This provides a far more accurate, comprehensive and performant
+;; result than `ansi-color.el' which is built-into Emacs.
 ;;
-;; * Regular ANSI colors
-;;
-;; * XTERM 256 colors
-;;
-;; * Truecolor (24-bit)
-;;
-;; * AIXTERM bright foreground color
-;;
-;; * AIXTERM bright background color (since 1.8)
-;;
-;; * Use bold for bright (since 1.8)
-;;
-;; * Works with compilation-mode
-;;
-;; * Works with eshell
-;;
-;; * More accurate than ansi-color.el
-;;
-;; * Should perform much better than ansi-color.el
-;;
-;;; Usage:
-;;
-;; Interactively or from Emacs Lisp call xterm-color-colorize-buffer
-;; to colorize an entire buffer.
-;;
-;; In Emacs Lisp, call xterm-color-filter to propertize strings that you can
-;; then insert into a buffer. All state is kept in buffer-local variables
-;; which means that control sequences can span xterm-color-filter calls.
-;;
-;; You may customize `xterm-color-debug' (default NIL, if T you will get warnings
-;; in *Messages* when unsupported escape sequences are encountered),
-;; `xterm-color-use-bold-for-bright' (default NIL), `xterm-color-names',
-;; `xterm-color-names-bright'. Additionally, you may set `xterm-color-preserve-properties'
-;; to T (default NIL, should be set to T if using xterm-color with eshell, see below).
-;;
-;; A buffer-local face attribute cache is used since 1.8 to improve performance.
-;; This means that if changes are made to `xterm-color-names' or `xterm-color-names-bright'
-;; or `xterm-color-use-bold-for-bright' at runtime, `xterm-color-clear-cache'
-;; should be called in a buffer with activated xterm-color for changes to take
-;; effect in that buffer.
-;;
-;; Example:
-;;
-;; (let ((buffer (generate-new-buffer "*xterm-color-test*")))
-;;   (with-current-buffer buffer
-;;     (insert (xterm-color-filter "\x1b[0;1;3;4"))
-;;     (insert (xterm-color-filter ";35"))
-;;     (insert (xterm-color-filter ";51mThis is only a test"))
-;;     (insert (xterm-color-filter "\x1b[0m")))
-;;   (switch-to-buffer buffer))
-;;
-;; * You can replace ansi-color.el with xterm-color for all comint buffers,
-;;   but this may create problems with modes that propertize strings
-;;   and feed them through comint-preoutput-filter-functions since xterm-color-filter
-;;   will strip all text properties.
-;;
-;;   The recommended configuration is to remove ansi-color-process-output from
-;;   comint-output-filter-functions and add xterm-color-filter as the *first*
-;;   hook in the *buffer-local* comint-preoutput-filter-functions for any comint-based
-;;   mode that you would like it to affect (e.g. shell-mode).
-;;
-;;   Additionally, it is recommended to disable font-locking for shell-mode buffers since
-;;   it interacts badly with comint and drastically affects performance
-;;   (https://github.com/atomontage/xterm-color/issues/28).
-;;
-;;   Font locking in shell-mode buffers is superfluous since xterm-color.el will handle
-;;   faces fine by itself.
-;;
-;;   An example configuration for shell-mode (M-x shell) is shown below:
-;;
-;; (setq comint-output-filter-functions
-;;       (remove 'ansi-color-process-output comint-output-filter-functions))
-;;
-;; (add-hook 'shell-mode-hook
-;;           (lambda ()
-;;             ;; Disable font-locking in this buffer to improve performance
-;;             (font-lock-mode -1)
-;;             ;; Prevent font-locking from being re-enabled in this buffer
-;;             (make-local-variable 'font-lock-function)
-;;             (setq font-lock-function (lambda (_) nil))
-;;             (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
-;;
-;; Also set TERM accordingly (xterm-256color) in the shell itself.
-;;
-;; * An example configuration for eshell
-;;
-;; (require 'eshell) ; or use with-eval-after-load
-;;
-;; (add-hook 'eshell-before-prompt-hook
-;;           (lambda ()
-;;             (setq xterm-color-preserve-properties t)))
-;;
-;;  (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
-;;  (setq eshell-output-filter-functions (remove 'eshell-handle-ansi-color eshell-output-filter-functions))
-;;  (setenv "TERM" "xterm-256color")
-;;
-;; * Compilation buffers
-;;
-;; Using `compilation-shell-minor-mode' with shell-mode buffers that have xterm-color
-;; enabled is NOT recommended, as `compilation-shell-minor-mode' depends on font-locking
-;; and causes severe performance degradation. Omit the statements that disable
-;; font-locking in the previously given shell-mode example configuration if you
-;; need it.
-;;
-;; For standalone compilation-mode buffers use the following configuration:
-;;
-;; (setq compilation-environment '("TERM=xterm-256color"))
-;;
-;; (defun my/advice-compilation-filter (f proc string)
-;;   (funcall f proc (xterm-color-filter string)))
-;;
-;; (advice-add 'compilation-filter :around #'my/advice-compilation-filter)
+;; Please see README.org for documentation including example configurations.
 ;;
 ;;; Notes:
 ;;

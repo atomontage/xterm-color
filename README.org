@@ -2,7 +2,10 @@
 [[http://melpa.org/#/xterm-color][https://melpa.org/packages/xterm-color-badge.svg]]
 [[http://stable.melpa.org/#/xterm-color][https://stable.melpa.org/packages/xterm-color-badge.svg]]
 
-xterm-color.el is an ANSI control sequence to text-property translator
+xterm-color.el is an ANSI control sequence to text-property translator.
+Translation takes place through state machine emulation which provides
+a far more accurate, comprehensive and performant result than ansi-color.el
+that is built-into Emacs.
 
 * Features
 + Regular ANSI color support
@@ -116,6 +119,8 @@ For comint or eshell:
 M-x shell || M-x eshell
 
 perl tests/xterm-colortest && perl tests/256colors2.pl
+
+printf "\x1b[0;1;3;4;35;51mThis is only a test\x1b[0m\n"
 
 Comparison with ansi-color.el:
 
