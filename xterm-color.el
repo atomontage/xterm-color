@@ -271,6 +271,7 @@ CONDITION must be a Lisp form which is evaluated as part of a COND
 condition clause. If it is an atom, it is rewritten to (= CONDITION ATTRIB).
 Otherwise it is used as is. As per COND statement, if CONDITION evaluates
 to T, rule body forms are evaluated as part of the body of the COND clause.
+
 SKIP, if given, must be an integer specifying the number of elements that
 should be skipped before the next iteration. The default is 1,
 going down SGR-LIST one element at a time."
@@ -694,7 +695,6 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;;;###autoload
 (cl-defun xterm-color-colorize-buffer (&optional use-overlays)
   "Apply `xterm-color-filter' to current buffer, and replace its contents.
-
 Colors are applied using 'face, unless font-lock-mode is active, in
 which case 'font-lock-face is used. Operation with font-lock mode active
 is not recommended.
@@ -895,7 +895,7 @@ effect when called from a buffer that does not have a cache."
 
 ;;;###autoload
 (defun xterm-color-test ()
-  "Create/display and render a new buffer that contains ANSI control sequences."
+  "Create, display and render a new buffer that contains ANSI control sequences."
   (interactive)
   (let* ((name (generate-new-buffer-name "*xterm-color-test*"))
          (buf (get-buffer-create name)))
