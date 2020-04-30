@@ -235,7 +235,7 @@ inverse-color, frame, overline SGR state machine bits.")
   "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is not NIL."
   (when xterm-color-debug
     (let ((message-truncate-lines t))
-      (message "xterm-color: %s" (apply 'format format-string args))
+      (message "xterm-color: %s" (apply #'format format-string args))
       (message nil))))
 
 
@@ -261,19 +261,19 @@ inverse-color, frame, overline SGR state machine bits.")
 For each attribute in SGR-LIST, check to see if it matches a rule in BODY and
 evaluate the rule body if that is the case.
 
-ATTRIB should be a symbol that will be bound to SGR-LIST attributes in BODY.
-SGR-LIST should be a list of SGR attributes (integers) in LIFO order.
-BODY should contain rules with each rule being a list of form:
+ATTRIB must be a symbol that is bound to SGR-LIST attributes in BODY.
+SGR-LIST must be a list of SGR attributes (integers) in LIFO order.
+BODY must contain rules with each rule being a list of form:
 
  (:match (condition &key (skip 1)) rule-body-form..)
 
-CONDITION should be a Lisp form which will be evaluated as part of a COND
-condition clause. If it is an atom, it will be rewritten to (= CONDITION ATTRIB).
-Otherwise it will be used as is. As per COND statement, if CONDITION evaluates
-to T, rule body forms will be evaluated as part of the body of the COND clause.
-SKIP, if given, should be an integer specifying the number of elements that should
-be skipped before the next iteration. The default is 1, going down SGR-LIST
-one element at a time."
+CONDITION must be a Lisp form which is evaluated as part of a COND
+condition clause. If it is an atom, it is rewritten to (= CONDITION ATTRIB).
+Otherwise it is used as is. As per COND statement, if CONDITION evaluates
+to T, rule body forms are evaluated as part of the body of the COND clause.
+SKIP, if given, must be an integer specifying the number of elements that
+should be skipped before the next iteration. The default is 1,
+going down SGR-LIST one element at a time."
   (declare (indent defun))
   `(xterm-color--with-SGR-constants
      (cl-macrolet
@@ -328,7 +328,7 @@ one element at a time."
             (setq ,SGR-list (cdr ,SGR-list))))))))
 
 (defsubst xterm-color--dispatch-SGR (SGR-list)
-  "Update state machine based on SGR-LIST which should be a list of SGR attributes (integers)."
+  "Update state machine based on SGR-LIST which must be a list of SGR attributes (integers)."
   (xterm-color--create-SGR-table (elem SGR-list)
     (:match (0)  (reset!))                              ; RESET everything
 
@@ -413,7 +413,7 @@ one element at a time."
 
 Returns FIFO list of SGR attributes or NIL on errors.
 
-Characters should be in the ASCII set 0-9 (decimal 48 to 57) and are converted
+Characters must be in the ASCII set 0-9 (decimal 48 to 57) and are converted
 to integer digits by subtracting 48 from each character. E.g. Character 48
 is converted to integer digit 0, character 49 to integer digit1..
 Character 59 (;) is not converted but signifies that all accumulated integer
@@ -634,15 +634,15 @@ This function strips text properties that may be present in STRING."
      finally return
      (progn (when (eq state :char) (maybe-fontify))
             (setq xterm-color--state state)
-            (mapconcat 'identity (nreverse result) "")))))
+            (mapconcat #'identity (nreverse result) "")))))
 
 ;;;###autoload
 (defun xterm-color-filter (string)
   "Translate ANSI color sequences in STRING into text properties.
 Return new STRING with text properties applied.
 
-This function will check if `xterm-color-preserve-properties' is
-set to T and only call `xterm-color-filter-strip' on substrings
+This function checks if `xterm-color-preserve-properties' is
+set to T and only calls `xterm-color-filter-strip' on substrings
 that do not have text properties applied (passing through the rest
 unmodified). Preserving properties in this fashion is not very robust
 as there may be situations where text properties are applied on ANSI
@@ -657,7 +657,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
      for (_ props substring) in (xterm-color--string-properties string) do
      (push (if props substring (xterm-color-filter-strip substring))
            result)
-     finally return (mapconcat 'identity (nreverse result) ""))))
+     finally return (mapconcat #'identity (nreverse result) ""))))
 
 ;;;###autoload
 (defun xterm-color-256 (color)
@@ -695,12 +695,12 @@ This can be inserted into `comint-preoutput-filter-functions'."
 (cl-defun xterm-color-colorize-buffer (&optional use-overlays)
   "Apply `xterm-color-filter' to current buffer, and replace its contents.
 
-Colors will be applied using 'face, unless font-lock-mode is active, in
-which case 'font-lock-face will be used. Operation with font-lock mode
-active is not recommended.
+Colors are applied using 'face, unless font-lock-mode is active, in
+which case 'font-lock-face is used. Operation with font-lock mode active
+is not recommended.
 
-If USE-OVERLAYS is non-nil then colors will be applied to the buffer using
-overlays instead of text properties. A C-u prefix arg causes overlays to be used."
+If USE-OVERLAYS is non-nil, colors are applied to the buffer using overlays
+instead of text properties. A C-u prefix arg causes overlays to be used."
   (interactive "P")
   (let ((read-only-p buffer-read-only))
     (when read-only-p
@@ -749,11 +749,11 @@ effect when called from a buffer that does not have a cache."
                             (insert
                              (if xterm-color--test-do-filter
                                  (xterm-color-filter
-                                  (apply 'format msg args))
-                               (apply 'format msg args))))
+                                  (apply #'format msg args))
+                               (apply #'format msg args))))
                (test (name &rest attribs)
                      (ansi-filter "\x1b[0;%smThis is only a test!\x1b[0m\t --[ %s\n"
-                                  (mapconcat 'identity attribs ";")
+                                  (mapconcat #'identity attribs ";")
                                   name)))
      ,@body))
 
@@ -919,7 +919,7 @@ effect when called from a buffer that does not have a cache."
 ;;;###autoload
 (defun xterm-color-test-raw ()
   "Create and display a new buffer that contains ANSI SGR control sequences.
-ANSI sequences will not be processed. One can use a different Emacs package
+ANSI sequences are not processed. One can use a different Emacs package
 (e.g. ansi-color.el) to do so. This is really meant to be used for
 easy comparisons/benchmarks with libraries that offer similar functionality."
   (interactive)
