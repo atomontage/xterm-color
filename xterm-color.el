@@ -612,6 +612,9 @@ This function strips text properties that may be present in STRING."
                (state! :ansi-csi))
               ((= char ?\])
                (state! :ansi-osc))
+              ((or (= char ?\()
+                   (= char ?\)))
+               (state! :set-char))
               (t
                (push-char! char)
                (state! :char))))
@@ -631,7 +634,10 @@ This function strips text properties that may be present in STRING."
        (:ansi-osc-esc
         (cond ((= char ?\\)
                (state! :char))
-              (t (state! :ansi-osc)))))
+              (t (state! :ansi-osc))))
+       (:set-char
+        (xterm-color--message "%s SET-CHAR not implemented" char)
+        (state! :char)))
      finally return
      (progn (when (eq state :char) (maybe-fontify))
             (setq xterm-color--state state)
