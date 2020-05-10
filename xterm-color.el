@@ -903,7 +903,7 @@ effect when called from a buffer that does not have a cache."
 
 ;;;###autoload
 (defun xterm-color-test ()
-  "Create, display and render a new buffer that contains ANSI control sequences."
+  "Create, display and render a new buffer containing ANSI control sequences."
   (interactive)
   (let* ((name (generate-new-buffer-name "*xterm-color-test*"))
          (buf (get-buffer-create name)))
@@ -926,10 +926,10 @@ effect when called from a buffer that does not have a cache."
 
 ;;;###autoload
 (defun xterm-color-test-raw ()
-  "Create and display a new buffer that contains ANSI SGR control sequences.
-ANSI sequences are not processed. One can use a different Emacs package
-(e.g. ansi-color.el) to do so. This is really meant to be used for
-easy comparisons/benchmarks with libraries that offer similar functionality."
+  "Create and display a new buffer containing ANSI SGR control sequences.
+ANSI sequences are not processed. One can use a different Emacs package,
+such as ansi-color.el to do so. This is really meant to be used for easy
+comparisons/benchmarks with libraries that offer similar functionality."
   (interactive)
   (let* ((name (generate-new-buffer-name "*xterm-color-test-raw*"))
          (buf (get-buffer-create name)))
