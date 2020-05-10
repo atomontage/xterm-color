@@ -1,9 +1,10 @@
 * Changes
 
-** 2.0 (2020-XX-XX)
+** 2.0 (2020-05-10)
 
-+ Added truecolor (24-bit) and overlay support.
-  Thanks to Dan Davison for initial implementation.
++ Added truecolor (24-bit) and overlay support. Overlays may optionally
+  be used only when colorizing entire buffers. Thanks to Dan Davison
+  for initial implementation.
 
 + More robust parsing. Errors are no longer signaled to avoid
   desynchronizing the state machine. Unsupported SGR sequences that
