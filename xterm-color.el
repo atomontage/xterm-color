@@ -563,7 +563,7 @@ in LIFO order."
                                                      (face! :weight 'bold))))
 
                                           (when bg (make-color-bg))
-                                          (setf (gethash k table) plistf)))))
+                                          (puthash k plistf table)))))
             (maybe-fontify ()    '(when xterm-color--char-list
                                     (let ((s (concat (nreverse xterm-color--char-list))))
                                       (when (graphics?)
