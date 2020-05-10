@@ -162,8 +162,10 @@ All characters are stored in reverse, LIFO, order.")
 (make-variable-buffer-local 'xterm-color--CSI-list)
 
 (defvar xterm-color--state :char
-  "Current state of ANSI sequence state machine.
-Can be one of :char, :ansi-esc, :ansi-csi, :ansi-osc, :ansi-osc-esc.")
+  "Current state of ANSI state machine.
+
+Can be one of :char, :set-char, :ansi-esc, :ansi-csi, :ansi-osc,
+:ansi-osc-esc.")
 
 (make-variable-buffer-local 'xterm-color--state)
 
@@ -363,6 +365,15 @@ going down SGR-LIST one element at a time."
                     (set-truecolor! r g b xterm-color--current-fg))
                 (xterm-color--message "SGR 38;2;%s;%s;%s error, expected 38;2;R;G;B"
                                       r g b))))
+    (:match ((and (eq 38 (cl-first SGR-list))
+                  (eq 5 (cl-second SGR-list)))
+             :skip 3)                                   ; XTERM 256 FG color
+            (if-let ((color (cl-third SGR-list)))
+                (if (> color 255)
+                    (xterm-color--message "SGR 38;5;%s exceeds range" color)
+                  (set-f! color))
+              (xterm-color--message "SGR 38;5;%s error, expected 38;5;COLOR"
+                                    color)))
 
     (:match ((and (eq 48 (cl-first SGR-list))
                   (eq 2 (cl-second SGR-list)))          ; Truecolor (24-bit) BG color
@@ -378,15 +389,6 @@ going down SGR-LIST one element at a time."
                 (xterm-color--message "SGR 48;2;%s;%s;%s error, expected 48;2;R;G;B"
                                       r g b))))
 
-    (:match ((and (eq 38 (cl-first SGR-list))
-                  (eq 5 (cl-second SGR-list)))
-             :skip 3)                                   ; XTERM 256 FG color
-            (if-let ((color (cl-third SGR-list)))
-                (if (> color 255)
-                    (xterm-color--message "SGR 38;5;%s exceeds range" color)
-                  (set-f! color))
-              (xterm-color--message "SGR 38;5;%s error, expected 38;5;COLOR"
-                                    color)))
     (:match ((and (eq 48 (cl-first SGR-list))
                   (eq 5 (cl-second SGR-list)))
              :skip 3)                                   ; XTERM 256 BG color
