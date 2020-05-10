@@ -3,6 +3,7 @@
 [[http://stable.melpa.org/#/xterm-color][https://stable.melpa.org/packages/xterm-color-badge.svg]]
 
 xterm-color.el is an ANSI control sequence to text-property translator.
+
 Translation takes place through state machine emulation which provides
 a far more accurate, comprehensive and performant result than ansi-color.el
 that is built-into Emacs.
