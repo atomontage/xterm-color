@@ -18,7 +18,6 @@ that is built-into Emacs.
 + When colorizing entire buffers, optional overlay support (since 2.0)
 + Works with compilation-mode
 + Works with eshell
-+ Bonus: Significantly faster than ansi-color.el
 
 * Usage
 Interactively or from Emacs Lisp, call ~xterm-color-colorize-buffer~ to
@@ -85,8 +84,8 @@ For standalone compilation buffers use the following configuration:
 (advice-add 'compilation-filter :around #'my/advice-compilation-filter)
 #+END_SRC
 
-For programmatic usage, in Emacs Lisp code call ~xterm-color-filter~ to
-propertize strings that you can then insert into a buffer. All state is kept in
+For programmatic usage from Emacs Lisp, call ~xterm-color-filter~ to propertize
+strings that you can then insert into a buffer. All state is kept in
 buffer-local variables which means that control sequences can span
 ~xterm-color-filter~ calls (state machine processing).
 
@@ -133,7 +132,7 @@ M-x xterm-color-test-raw then M-: (ansi-color-apply-on-region (point-min) (point
 
 #+END_SRC
 
-[[file:img/xterm-color.png][file:img/xterm-thumb.png]]  [[file:img/godwars2.png][file:img/godwars2-thumb.png]]
+[[file:img/xterm-color.png][file:img/xterm-color-thumb.png]]  [[file:img/godwars2.png][file:img/godwars2-thumb.png]]  [[file:img/wttr.png][file:img/wttr-thumb.png]]
 
 * License
 The code comes with a BSD-style license so you can basically do with it
