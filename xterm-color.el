@@ -1,9 +1,9 @@
 ;;; xterm-color.el --- ANSI, XTERM 256 and Truecolor support -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010-2020 xristos@sdf.org
-;; All rights reserved.
+;; All rights reserved
 
-;; Version: 1.9 - 2019-08-15
+;; Version: 2.0 - 2020-05-10
 ;; Author: xristos <xristos@sdf.org>
 ;; URL: https://github.com/atomontage/xterm-color
 ;; Package-Requires: ((emacs "24.4"))
