@@ -6,8 +6,11 @@
   be used only when colorizing entire buffers. Thanks to Dan Davison
   for initial implementation.
 
-+ More robust parsing. Errors are no longer signaled to avoid
-  desynchronizing the state machine. Unsupported SGR sequences that
-  happen to overlap with supported ones are skipped.
++ Better parsing and malformed input detection. Errors are no longer
+  signaled to avoid desynchronizing the state machine. Unsupported SGR
+  sequences that happen to overlap with supported ones are skipped.
+
++ Added `xterm-color-render' (default: T) that can be used to filter out
+  ANSI control sequences without applying them to the text.
 
 + Minor documentation fixes and style updates.

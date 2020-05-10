@@ -141,6 +141,13 @@ ok with eshell.")
 
 (make-variable-buffer-local 'xterm-color-preserve-properties)
 
+(defvar xterm-color-render t
+  "If T, render SGR attributes. Otherwise, discard them. The latter
+is useful when one wants to process and filter out ANSI control
+sequences, without applying them to the text.")
+
+(make-variable-buffer-local 'xterm-color-render)
+
 (defvar xterm-color--current-fg nil)
 
 (make-variable-buffer-local 'xterm-color--current-fg)
@@ -566,7 +573,7 @@ in LIFO order."
                                           (puthash k plistf table)))))
             (maybe-fontify ()    '(when xterm-color--char-list
                                     (let ((s (concat (nreverse xterm-color--char-list))))
-                                      (when (graphics?)
+                                      (when (and xterm-color-render (graphics?))
                                         (add-text-properties
                                          0 (length s)
                                          (list 'xterm-color t
@@ -716,7 +723,7 @@ instead of text properties. A C-u prefix arg causes overlays to be used."
         (cl-return-from xterm-color-colorize-buffer))
       (read-only-mode -1))
     (insert (xterm-color-filter (delete-and-extract-region (point-min) (point-max))))
-    (when use-overlays
+    (when (and xterm-color-render use-overlays)
         (xterm-color--convert-text-properties-to-overlays (point-min) (point-max)))
     (goto-char (point-min))
     (when read-only-p (read-only-mode 1))))

@@ -16,6 +16,7 @@ that is built-into Emacs.
 + AIXTERM bright background color (since 1.8)
 + Use bold instead of bright (since 1.8)
 + When colorizing entire buffers, optional overlay support (since 2.0)
++ Optionally, filter out ANSI control sequences (since 2.0)
 + Works with compilation-mode
 + Works with eshell
 
@@ -105,7 +106,12 @@ You may customize ~xterm-color-debug~ (default NIL, if T you will get warnings i
 unsupported escape sequences are encountered), ~xterm-color-use-bold-for-bright~ (default NIL),
 ~xterm-color-names~,  ~xterm-color-names-bright~. Additionally, you may set
 ~xterm-color-preserve-properties~ to T (default NIL, should be set to T if using xterm-color with
-eshell, see below). A buffer-local face attribute cache is used since 1.8 to improve performance.
+eshell, see below).
+
+If you want to filter out all ANSI control sequences, without applying them to the text,
+set ~xterm-color-render~ to NIL (buffer-local, default T).
+
+A buffer-local face attribute cache is used since 1.8 to improve performance.
 This means that if changes are made to ~xterm-color-names~ or ~xterm-color-names-bright~ or
 ~xterm-color-use-bold-for-bright~ at runtime, ~xterm-color-clear-cache~ should be called
 in a buffer with activated xterm-color for changes to take effect in that buffer.
