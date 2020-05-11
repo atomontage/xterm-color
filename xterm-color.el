@@ -52,7 +52,7 @@
 ;;
 ;; Supported SGR attributes: Look at `xterm-color--dispatch-SGR'.
 ;; SGR attribute 1 is rendered as bright unless `xterm-color-use-bold-for-bright'
-;; is T which will, if current font has a bold variant, switch to bold.
+;; is non-nil which will, if current font has a bold variant, switch to bold.
 ;; SGR attributes 38 and 48 are supported in both their 256 color and truecolor
 ;; (24-bit) variants.
 
@@ -93,12 +93,12 @@
 
 
 (defcustom xterm-color-debug nil
-  "Print ANSI state machine debug information in *Messages* if not NIL."
+  "If non-nil, print ANSI state machine debug information in *Messages*."
   :type 'boolean
   :group 'xterm-color)
 
 (defcustom xterm-color-use-bold-for-bright nil
-  "Render bright foreground attribute as bold."
+  "If non-nil, render bright foreground attribute as bold."
   :type 'boolean
   :group 'xterm-color)
 
@@ -134,63 +134,46 @@
 ;;;
 
 
-(defvar xterm-color-preserve-properties nil
-  "If T, preserve existing text properties on input about to be filtered.
-This should be NIL most of the time. It is really meant for and works
-ok with eshell.")
+(defvar-local xterm-color-preserve-properties nil
+  "If non-nil, preserve existing text properties on input about to be filtered.
+Effectively this skips ANSI control sequence processing for input parts
+that have text properties applied. This should be nil most of the time.
+It is really meant for and works ok with eshell.")
 
-(make-variable-buffer-local 'xterm-color-preserve-properties)
+(defvar-local xterm-color-render t
+  "If non-nil, render SGR attributes. Otherwise, discard them.
+The latter enables processing and filtering out ANSI control sequences,
+without applying them to the text.")
 
-(defvar xterm-color-render t
-  "If T, render SGR attributes. Otherwise, discard them. The latter
-is useful when one wants to process and filter out ANSI control
-sequences, without applying them to the text.")
+(defvar-local xterm-color--current-fg nil)
 
-(make-variable-buffer-local 'xterm-color-render)
+(defvar-local xterm-color--current-bg nil)
 
-(defvar xterm-color--current-fg nil)
-
-(make-variable-buffer-local 'xterm-color--current-fg)
-
-(defvar xterm-color--current-bg nil)
-
-(make-variable-buffer-local 'xterm-color--current-bg)
-
-(defvar xterm-color--char-list nil
+(defvar-local xterm-color--char-list nil
   "List of characters that the current ANSI color applies to.
 All characters are stored in reverse, LIFO, order.")
 
-(make-variable-buffer-local 'xterm-color--char-list)
-
-(defvar xterm-color--CSI-list nil
+(defvar-local xterm-color--CSI-list nil
   "List of current ANSI CSI sequence bytes (characters).
 All characters are stored in reverse, LIFO, order.")
 
-(make-variable-buffer-local 'xterm-color--CSI-list)
-
-(defvar xterm-color--state :char
+(defvar-local xterm-color--state :char
   "Current state of ANSI state machine.
 
 Can be one of :char, :set-char, :ansi-esc, :ansi-csi, :ansi-osc,
 :ansi-osc-esc.")
 
-(make-variable-buffer-local 'xterm-color--state)
+(defvar-local xterm-color--attributes 0
+  "Bitvector that keeps track of state machine attributes.
 
-(defvar xterm-color--attributes 0
-  "Bitvector that keeps track of bright, italic, underline, strike-through,
-inverse-color, frame, overline SGR state machine bits.")
+These are: bright, italic, underline, strike-through, inverse-color,
+frame, overline.")
 
-(make-variable-buffer-local 'xterm-color--attributes)
-
-(defvar xterm-color--face-cache nil
+(defvar-local xterm-color--face-cache nil
   "Cache for auto-generated face attributes.")
 
-(make-variable-buffer-local 'xterm-color--face-cache)
-
-(defvar xterm-color--truecolor-face-cache nil
+(defvar-local xterm-color--truecolor-face-cache nil
   "Cache for auto-generated face attributes.")
-
-(make-variable-buffer-local 'xterm-color--truecolor-face-cache)
 
 
 ;;;
@@ -223,7 +206,7 @@ inverse-color, frame, overline SGR state machine bits.")
        (cl-return-from xterm-color--string-properties (nreverse result))))))
 
 (defun xterm-color--convert-text-properties-to-overlays (beg end)
-  "Delete face text properties between BEG and END, replacing with equivalent overlays."
+  "Transform face text properties between BEG and END, to equivalent overlays."
   (save-excursion
     (goto-char beg)
     (let ((face-prop (if (or (get-text-property (point) 'font-lock-face)
@@ -241,7 +224,8 @@ inverse-color, frame, overline SGR state machine bits.")
       (remove-text-properties beg end (list 'xterm-color nil face-prop nil)))))
 
 (defun xterm-color--message (format-string &rest args)
-  "Call `message' with FORMAT-STRING and ARGS if `xterm-color-debug' is not NIL."
+  "Call `message' with FORMAT-STRING and ARGS.
+Also see `xterm-color-debug'."
   (when xterm-color-debug
     (let ((message-truncate-lines t))
       (message "xterm-color: %s" (apply #'format format-string args))
@@ -279,7 +263,7 @@ BODY must contain rules with each rule being a list of form:
 CONDITION must be a Lisp form which is evaluated as part of a COND
 condition clause. If it is an atom, it is rewritten to (= CONDITION ATTRIB).
 Otherwise it is used as is. As per COND statement, if CONDITION evaluates
-to T, rule body forms are evaluated as part of the body of the COND clause.
+to non-nil, rule body forms are evaluated as part of the body of the COND clause.
 
 SKIP, if given, must be an integer specifying the number of elements that
 should be skipped before the next iteration. The default is 1,
@@ -338,7 +322,7 @@ going down SGR-LIST one element at a time."
             (setq ,SGR-list (cdr ,SGR-list))))))))
 
 (defsubst xterm-color--dispatch-SGR (SGR-list)
-  "Update state machine based on SGR-LIST which must be a list of SGR attributes (integers)."
+  "Update state machine based on SGR-LIST (list of SGR attributes /integers)."
   (xterm-color--create-SGR-table (elem SGR-list)
     (:match (0)  (reset!))                              ; RESET everything
 
@@ -421,7 +405,7 @@ going down SGR-LIST one element at a time."
 (defsubst xterm-color--SGR-attributes (list)
   "Convert LIFO list of SGR characters to FIFO list of SGR attributes (integers).
 
-Returns FIFO list of SGR attributes or NIL on errors.
+Returns FIFO list of SGR attributes or nil on errors.
 
 Characters must be in the ASCII set 0-9 (decimal 48 to 57) and are converted
 to integer digits by subtracting 48 from each character. E.g. Character 48
@@ -442,7 +426,7 @@ Given (48 49 50 59 50 50 59 48 49) return (10 22 210)"
        (let ((e (- c 48)))
          (unless (<= 0 e 9)
            (xterm-color--message "Invalid SGR attribute %s" c)
-           (cl-return nil))
+           (cl-return))
          (cl-incf n (* mul e))
          (setq mul (* mul 10)))
      (push n ret)
@@ -595,7 +579,8 @@ in LIFO order."
   "Translate ANSI color sequences in STRING into text properties.
 Return new STRING with text properties applied.
 
-This function strips text properties that may be present in STRING."
+In order to get maximum performance, this function strips text properties
+if they are present in STRING."
   (unless xterm-color--face-cache
     (setq xterm-color--face-cache
           (make-hash-table :weakness 'value)))
@@ -657,13 +642,14 @@ This function strips text properties that may be present in STRING."
   "Translate ANSI color sequences in STRING into text properties.
 Return new STRING with text properties applied.
 
-This function checks if `xterm-color-preserve-properties' is
-set to T and only calls `xterm-color-filter-strip' on substrings
-that do not have text properties applied (passing through the rest
-unmodified). Preserving properties in this fashion is not very robust
-as there may be situations where text properties are applied on ANSI
-data, which will desync the state machine. Preserving properties works
-ok and is really meant for eshell.
+This function checks if `xterm-color-preserve-properties' is non-nil
+and only calls `xterm-color-filter-strip' on substrings that do not
+have text properties applied (passing through the rest unmodified).
+Preserving properties in this fashion is not very robust as there may
+be situations where text properties are applied on ANSI data, which
+will desync the state machine.
+
+Preserving properties works ok with and is really meant for eshell.
 
 This can be inserted into `comint-preoutput-filter-functions'."
   (if (not xterm-color-preserve-properties)
