@@ -416,7 +416,7 @@ digits should be reversed and combined into a single integer (SGR attribute).
 Examples:
 
 Given (48) return (0)
-Given (59) return (0)
+Given (59) return (0 0)
 Given (48 49 50) return (210)
 Given (48 49 50 59 50 50 59 48 49) return (10 22 210)"
   (cl-loop
@@ -481,12 +481,12 @@ in LIFO order."
             ;; for hash table keys. It can encode two colors (foreground
             ;; and background) that can either be truecolor 24bit or XTerm 256
             ;; color 8bit. XTerm 256 color values subsume ANSI colors, a
-            ;; separate encoding scheme for these is not needed.
+            ;; separate encoding scheme is not needed.
             ;;
             ;; The scheme used also accounts for the combination of a truecolor
             ;; with an XTerm 256 color as part of the same hashed entry. Since
             ;; two different hash tables are used to work around 32bit Emacs
-            ;; limited integer range, two packing schemes are actually used:
+            ;; limited integer range, two packing schemes are needed:
             ;;
             ;; High<         25 bits       >Low
             ;; ATTR[7 bits]BG[9 bits]FG[9 bits] where BG and FG are each
