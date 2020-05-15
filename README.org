@@ -21,6 +21,12 @@ that is built-into Emacs.
 + Works with eshell
 
 * Usage
+#+BEGIN_SRC emacs-lisp
+;; Install through MELPA or ensure directory of xterm-color.el is in your
+;; load-path and add the following to your init file:
+(require 'xterm-color)
+#+END_SRC
+
 Interactively or from Emacs Lisp, call ~xterm-color-colorize-buffer~ to
 colorize an entire buffer.
 
