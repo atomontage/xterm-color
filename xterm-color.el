@@ -601,7 +601,7 @@ if they are present in STRING."
          (t
           (if (graphics?)
               (push-char! char)
-            (out! (string char))))))
+            (out! (list char))))))
        (:ansi-esc
         (cond ((= char ?\[)
                (state! :ansi-csi))
@@ -636,7 +636,7 @@ if they are present in STRING."
      finally return
      (progn (when (eq state :char) (maybe-fontify))
             (setq xterm-color--state state)
-            (mapconcat #'identity (nreverse result) "")))))
+            (apply 'concat (nreverse result))))))
 
 ;;;###autoload
 (defun xterm-color-filter (string)
@@ -660,7 +660,7 @@ This can be inserted into `comint-preoutput-filter-functions'."
      for (_ props substring) in (xterm-color--string-properties string) do
      (push (if props substring (xterm-color-filter-strip substring))
            result)
-     finally return (mapconcat #'identity (nreverse result) ""))))
+     finally return (apply 'concat (nreverse result)))))
 
 ;;;###autoload
 (defun xterm-color-256 (color)
