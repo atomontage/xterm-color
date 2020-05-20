@@ -5,8 +5,8 @@
 xterm-color.el is an ANSI control sequence to text-property translator.
 
 Translation takes place through state machine emulation which provides
-a far more accurate, comprehensive and performant result than ansi-color.el
-that is built-into Emacs.
+a far more accurate, comprehensive result than ansi-color.el that is
+built-into Emacs, without compromising on performance.
 
 * Features
 + Regular ANSI color support
