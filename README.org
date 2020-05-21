@@ -27,6 +27,8 @@ Simple and most flexible method:
 ;; Clone this repository, ensure directory of xterm-color.el is in your
 ;; load-path and add the following to your init file:
 (require 'xterm-color)
+
+;; You should byte-compile xterm-color.el for maximum performance.
 #+END_SRC
 
 Alternatively, you can install through [[https://melpa.org/][MELPA]] or some other Emacs package
