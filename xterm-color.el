@@ -326,23 +326,13 @@ going down SGR-LIST one element at a time."
   "Update state machine based on SGR-LIST (list of SGR attributes /integers)."
   (xterm-color--create-SGR-table (elem SGR-list)
     (:match (0)  (reset!))                              ; RESET everything
-
     (:match ((<= 30 elem 37)) (set-f! (- elem 30)))     ; ANSI FG color
     (:match ((<= 40 elem 47)) (set-b! (- elem 40)))     ; ANSI BG color
-
     (:match (39) (set-f!   nil))                        ; RESET FG color (switch to default)
     (:match (49) (set-b!   nil))                        ; RESET BG color (switch to default)
     (:match (1)  (set-a!   +bright+))
     (:match (2)  (unset-a! +bright+))
-    (:match (3)  (set-a!   +italic+))
-    (:match (4)  (set-a!   +underline+))
-    (:match (7)  (set-a!   +negative+))
-    (:match (9)  (set-a!   +strike-through+))
     (:match (22) (unset-a! +bright+))
-    (:match (23) (unset-a! +italic+))
-    (:match (24) (unset-a! +underline+))
-    (:match (27) (unset-a! +negative+))
-    (:match (29) (unset-a! +strike-through+))
 
     (:match ((and (eq 38 (cl-first SGR-list))
                   (eq 2 (cl-second SGR-list)))          ; Truecolor (24-bit) FG color
@@ -401,7 +391,16 @@ going down SGR-LIST one element at a time."
             ;; mapped to xterm-color-names-bright by xterm-color-256
             (set-f! (- elem 82)))
     ;; Same for BG, rescale to 8-15
-    (:match ((<= 100 elem 107)) (set-b! (- elem 92))))) ; AIXTERM hi-intensity BG
+    (:match ((<= 100 elem 107)) (set-b! (- elem 92)))   ; AIXTERM hi-intensity BG
+
+    (:match (4)  (set-a!   +underline+))
+    (:match (24) (unset-a! +underline+))
+    (:match (3)  (set-a!   +italic+))
+    (:match (23) (unset-a! +italic+))
+    (:match (9)  (set-a!   +strike-through+))
+    (:match (29) (unset-a! +strike-through+))
+    (:match (7)  (set-a!   +negative+))
+    (:match (27) (unset-a! +negative+))))
 
 (defsubst xterm-color--SGR-attributes (list)
   "Convert LIFO list of SGR characters to FIFO list of SGR attributes (integers).
