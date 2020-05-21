@@ -262,7 +262,7 @@ BODY must contain rules with each rule being a list of form:
  (:match (condition &key (skip 1)) rule-body-form..)
 
 CONDITION must be a Lisp form which is evaluated as part of a COND
-condition clause. If it is an atom, it is rewritten to (= CONDITION ATTRIB).
+condition clause. If it is an atom, it is rewritten to (eq CONDITION ATTRIB).
 Otherwise it is used as is. As per COND statement, if CONDITION evaluates
 to non-nil, rule body forms are evaluated as part of the body of the COND clause.
 
@@ -312,7 +312,7 @@ going down SGR-LIST one element at a time."
             (when (or (null skip) (cddr rest))
               (error "Rule (%s (%s..)..) has malformed arguments: %s" tag c rest))
             ;; Condition part of COND
-            collect `(,(if (atom c) `(= ,c ,attrib) c)
+            collect `(,(if (atom c) `(eq ,c ,attrib) c)
                       ;; Body of COND
                       ,@rule-body
                       (setq ,SGR-list
@@ -443,11 +443,11 @@ Given (48 49 50 59 50 50 59 48 49) return (10 22 210)"
   "Update state machine based on CSI parameters collected so far.
 Parameters are taken from `xterm-color--CSI-list' which stores them
 in LIFO order."
-  (let* ((csi xterm-color--CSI-list)
-         (term (car csi))               ; final parameter, terminator
-         (params (cdr csi)))            ; rest of parameters, LIFO order
+  (let* ((csi    xterm-color--CSI-list)
+         (term   (car csi))               ; final parameter, terminator
+         (params (cdr csi)))              ; rest of parameters, LIFO order
     (setq xterm-color--CSI-list nil)
-    (cond ((= ?m term)
+    (cond ((eq ?m term)
            ;; SGR
            (let ((SGR-list (if (null params) '(0)
                              (xterm-color--SGR-attributes params))))
@@ -591,45 +591,45 @@ if they are present in STRING."
     (cl-loop
      with state = xterm-color--state and result
      for char across string do
-     (cl-case state
-       (:char
+     (cond
+       ((eq state :char)
         (cond
-         ((= char 27)                    ; ESC
+         ((eq char 27)                    ; ESC
           (maybe-fontify)
           (state! :ansi-esc))
          (t
           (if (graphics?)
               (push-char! char)
             (out! (list char))))))
-       (:ansi-esc
-        (cond ((= char ?\[)
+       ((eq state :ansi-esc)
+        (cond ((eq char ?\[)
                (state! :ansi-csi))
-              ((= char ?\])
+              ((eq char ?\])
                (state! :ansi-osc))
-              ((or (= char ?\()
-                   (= char ?\)))
+              ((or (eq char ?\()
+                   (eq char ?\)))
                (state! :set-char))
               (t
                (push-char! char)
                (state! :char))))
-       (:ansi-csi
+       ((eq state :ansi-csi)
         (push-csi! char)
         (when (and (>= char #x40)
                    (<= char #x7e))
           (xterm-color--dispatch-CSI)
           (state! :char)))
-       (:ansi-osc
+       ((eq state :ansi-osc)
         ;; OSC sequences are skipped
-        (cond ((= char 7)
+        (cond ((eq char 7)
                (state! :char))
-              ((= char 27)
+              ((eq char 27)
                ;; ESC
                (state! :ansi-osc-esc))))
-       (:ansi-osc-esc
-        (cond ((= char ?\\)
+       ((eq state :ansi-osc-esc)
+        (cond ((eq char ?\\)
                (state! :char))
               (t (state! :ansi-osc))))
-       (:set-char
+       ((eq state :set-char)
         (xterm-color--message "%s SET-CHAR not implemented" char)
         (state! :char)))
      finally return
