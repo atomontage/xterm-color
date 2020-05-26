@@ -380,11 +380,6 @@ going down SGR-LIST one element at a time."
                 (set-b! color))
               (xterm-color--message "SGR 48;5;%s error, expected 48;5;COLOR"
                                     color)))
-
-    (:match (51) (set-a!   +frame+))
-    (:match (53) (set-a!   +overline+))
-    (:match (54) (unset-a! +frame+))
-    (:match (55) (unset-a! +overline+))
     (:match ((<= 90 elem 97))                           ; AIXTERM hi-intensity FG
             ;; Rather than setting bright, which would be wrong,
             ;; rescale color to fall within 8-15 so that it gets
@@ -393,6 +388,10 @@ going down SGR-LIST one element at a time."
     ;; Same for BG, rescale to 8-15
     (:match ((<= 100 elem 107)) (set-b! (- elem 92)))   ; AIXTERM hi-intensity BG
 
+    (:match (51) (set-a!   +frame+))
+    (:match (53) (set-a!   +overline+))
+    (:match (54) (unset-a! +frame+))
+    (:match (55) (unset-a! +overline+))
     (:match (4)  (set-a!   +underline+))
     (:match (24) (unset-a! +underline+))
     (:match (3)  (set-a!   +italic+))
