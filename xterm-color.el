@@ -283,7 +283,7 @@ going down SGR-LIST one element at a time."
           (set-b! (bg-color) `(setq xterm-color--current-bg ,bg-color))
 
           (set-truecolor! (r g b current-color)
-                          ;; We want a single integer to be able to
+                          ;; A single integer must be able to
                           ;; hold and distinguish between:
                           ;;
                           ;; - 24bit truecolor values

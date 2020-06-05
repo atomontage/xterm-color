@@ -120,10 +120,11 @@ You may customize ~xterm-color-debug~ (default nil, if non-nil you will get warn
 in *Messages* when unsupported escape sequences are encountered),
 ~xterm-color-use-bold-for-bright~ (default nil), ~xterm-color-names~,
 ~xterm-color-names-bright~. Additionally, you may set ~xterm-color-preserve-properties~
-to t (default nil, should be set to t if using xterm-color with eshell, see below).
+to t (default nil, should be set to t only if using xterm-color with eshell, see
+previously mentioned configuration).
 
 If you want to filter out all ANSI control sequences, without applying them to the text,
-set ~xterm-color-render~ to nil (buffer-local, default t).
+set ~xterm-color-render~ to nil.
 
 A buffer-local face attribute cache is used since 1.8 to improve performance.
 This means that if changes are made to ~xterm-color-names~ or ~xterm-color-names-bright~ or
