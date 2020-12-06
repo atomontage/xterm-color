@@ -38,6 +38,21 @@ manager.
 Interactively or from Emacs Lisp, call ~xterm-color-colorize-buffer~ to
 colorize an entire buffer.
 
+You may customize ~xterm-color-debug~ (default nil, if non-nil you will get warnings
+in *Messages* when unsupported escape sequences are encountered),
+~xterm-color-use-bold-for-bright~ (default nil), ~xterm-color-names~,
+~xterm-color-names-bright~. Additionally, you may set ~xterm-color-preserve-properties~
+to t (default nil, should be set to t only if using xterm-color with eshell, see below).
+
+If you want to filter out all ANSI control sequences, without applying them to the text,
+set ~xterm-color-render~ to nil.
+
+A buffer-local face attribute cache is used since 1.8 to improve performance.
+This means that if changes are made to ~xterm-color-names~ or ~xterm-color-names-bright~ or
+~xterm-color-use-bold-for-bright~ at runtime, ~xterm-color-clear-cache~ should be called
+in a buffer with activated xterm-color for changes to take effect in that buffer.
+
+** Comint
 You can replace ansi-color.el with xterm-color for all comint buffers,
 but you should take into account modes that propertize strings and pass them
 through ~comint-preoutput-filter-functions~ since ~xterm-color-filter~ will
@@ -52,7 +67,7 @@ Additionally, it is recommended to disable font-locking for shell-mode buffers
 Font locking in shell-mode buffers is superfluous since xterm-color.el will
 handle faces fine by itself.
 
-Example configurations for shell-mode (M-x shell) and eshell:
+Example configuration for shell-mode (M-x shell):
 
 #+BEGIN_SRC emacs-lisp
 (setq comint-output-filter-functions
@@ -68,9 +83,18 @@ Example configurations for shell-mode (M-x shell) and eshell:
             (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
 
 ;; Also set TERM accordingly (xterm-256color) in the shell itself.
+#+END_SRC
 
-;; An example configuration for eshell
+Using ~compilation-shell-minor-mode~ (NOTE: not the same as compilation-mode)
+with shell-mode buffers that have xterm-color enabled is NOT recommended,
+as ~compilation-shell-minor-mode~ depends on font-locking and causes severe
+performance degradation. Omit the statements that disable font-locking in the
+shell-mode example configuration if you need it.
 
+** Eshell
+An example configuration for eshell:
+
+#+BEGIN_SRC emacs-lisp
 (require 'eshell) ; or use with-eval-after-load
 
 (add-hook 'eshell-before-prompt-hook
@@ -82,12 +106,7 @@ Example configurations for shell-mode (M-x shell) and eshell:
 (setenv "TERM" "xterm-256color")
 #+END_SRC
 
-Using ~compilation-shell-minor-mode~ (NOTE: not the same as compilation-mode)
-with shell-mode buffers that have xterm-color enabled is NOT recommended,
-as ~compilation-shell-minor-mode~ depends on font-locking and causes severe
-performance degradation. Omit the statements that disable font-locking in the
-shell-mode example configuration if you need it.
-
+** Compilation buffers
 For standalone compilation buffers use the following configuration:
 
 #+BEGIN_SRC emacs-lisp
@@ -99,6 +118,14 @@ For standalone compilation buffers use the following configuration:
 (advice-add 'compilation-filter :around #'my/advice-compilation-filter)
 #+END_SRC
 
+*NOTE*: This compilation-mode configuration will break
+[[https://github.com/Wilfred/ag.el][ag.el]] and [[https://github.com/dajva/rg.el][rg.el]],
+since these packages expect ANSI control sequences to be part of
+compilation output so that they can be used for matching. Suggestions
+for these packages to improve the way they perform matching
+[[https://github.com/dajva/rg.el/issues/65][already]] [[https://github.com/atomontage/xterm-color/issues/37][exist]].
+
+** Other
 For programmatic usage from Emacs Lisp, call ~xterm-color-filter~ to propertize
 strings that you can then insert into a buffer. All state is kept in
 buffer-local variables which means that control sequences can span
@@ -115,21 +142,6 @@ Example:
     (insert (xterm-color-filter "\x1b[0m")))
   (switch-to-buffer buffer))
 #+END_SRC
-
-You may customize ~xterm-color-debug~ (default nil, if non-nil you will get warnings
-in *Messages* when unsupported escape sequences are encountered),
-~xterm-color-use-bold-for-bright~ (default nil), ~xterm-color-names~,
-~xterm-color-names-bright~. Additionally, you may set ~xterm-color-preserve-properties~
-to t (default nil, should be set to t only if using xterm-color with eshell, see
-previously mentioned configuration).
-
-If you want to filter out all ANSI control sequences, without applying them to the text,
-set ~xterm-color-render~ to nil.
-
-A buffer-local face attribute cache is used since 1.8 to improve performance.
-This means that if changes are made to ~xterm-color-names~ or ~xterm-color-names-bright~ or
-~xterm-color-use-bold-for-bright~ at runtime, ~xterm-color-clear-cache~ should be called
-in a buffer with activated xterm-color for changes to take effect in that buffer.
 
 * Test
 #+BEGIN_SRC emacs-lisp
