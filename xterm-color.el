@@ -523,18 +523,13 @@ in LIFO order."
                                          xterm-color--face-cache)))
 
             (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
-            (make-color-fg ()    `(if (and bold-bright
-                                           (< fg 256)
-                                           (or (has? +bright+) (<= 8 fg 15)))
-                                      (progn (face! :weight 'bold)
-                                             (face! :foreground
-                                                    (fmt-256 (if (<= 8 fg) (- fg 8) fg))))
-                                    (face! :foreground
-                                           (if (> fg 255)
-                                               (fmt-24bit (unpack fg))
-                                             (fmt-256 (if (and (<= fg 7) (has? +bright+))
-                                                             (+ fg 8)
-                                                           fg))))))
+            (make-color-fg ()    `(face! :foreground
+                                         (if (> fg 255)
+                                             (fmt-24bit (unpack fg))
+                                           (fmt-256 (if (and (not bold-bright)
+                                                             (<= fg 7) (has? +bright+))
+                                                        (+ fg 8)
+                                                      fg)))))
             (make-color-bg ()    `(face! :background (cond ((> bg 255) (fmt-24bit (unpack bg)))
                                                            (t (fmt-256 bg)))))
             (make-face ()        `(let* (k
@@ -548,9 +543,9 @@ in LIFO order."
                                           (when (has? +overline+)       (face! :overline t))
                                           (when (has? +frame+)          (face! :box t))
 
-                                          (cond (fg (make-color-fg))
-                                                (t (when (and bold-bright (has? +bright+))
-                                                     (face! :weight 'bold))))
+                                          (when fg (make-color-fg))
+                                          (when (and bold-bright (has? +bright+))
+                                            (face! :weight 'bold))
 
                                           (when bg (make-color-bg))
                                           (puthash k plistf table)))))
