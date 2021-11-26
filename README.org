@@ -95,15 +95,17 @@ shell-mode example configuration if you need it.
 An example configuration for eshell:
 
 #+BEGIN_SRC emacs-lisp
-(require 'eshell) ; or use with-eval-after-load
+(with-eval-after-load 'esh-mode
+  (add-hook 'eshell-mode-hook
+          (lambda () (progn
+            (setq xterm-color-preserve-properties t)
+            (setenv "TERM" "xterm-256color"))))
 
-(add-hook 'eshell-before-prompt-hook
-          (lambda ()
-            (setq xterm-color-preserve-properties t)))
+  (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
 
-(add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
-(setq eshell-output-filter-functions (remove 'eshell-handle-ansi-color eshell-output-filter-functions))
-(setenv "TERM" "xterm-256color")
+  (setq eshell-output-filter-functions
+  (remove 'eshell-handle-ansi-color eshell-output-filter-functions))
+)
 #+END_SRC
 
 ** Compilation buffers
