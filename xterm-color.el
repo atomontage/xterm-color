@@ -103,6 +103,11 @@
   :type 'boolean
   :group 'xterm-color)
 
+(defcustom xterm-color-use-bright-for-bold t
+  "If non-nil, render bold foreground attribute as bright."
+  :type 'boolean
+  :group 'xterm-color)
+
 (defcustom xterm-color-names
   ["#192033"    ; black
    "#A93F43"    ; red
@@ -461,7 +466,8 @@ in LIFO order."
      (cl-symbol-macrolet ((fg           xterm-color--current-fg)
                           (bg           xterm-color--current-bg)
                           (attrs        xterm-color--attributes)
-                          (bold-bright  xterm-color-use-bold-for-bright))
+                          (bold-bright  xterm-color-use-bold-for-bright)
+                          (bright-bold  xterm-color-use-bright-for-bold))
        (cl-macrolet
            ((out! (x)            `(push ,x result))
             (push-char! (c)      `(push ,c xterm-color--char-list))
@@ -523,18 +529,25 @@ in LIFO order."
                                          xterm-color--face-cache)))
 
             (face! (k v)         `(setq plistf (plist-put plistf ,k ,v)))
-            (make-color-fg ()    `(if (and bold-bright
-                                           (< fg 256)
-                                           (or (has? +bright+) (<= 8 fg 15)))
-                                      (progn (face! :weight 'bold)
-                                             (face! :foreground
-                                                    (fmt-256 (if (<= 8 fg) (- fg 8) fg))))
-                                    (face! :foreground
-                                           (if (> fg 255)
-                                               (fmt-24bit (unpack fg))
-                                             (fmt-256 (if (and (<= fg 7) (has? +bright+))
-                                                             (+ fg 8)
-                                                           fg))))))
+            (make-color-fg ()    `(cond ((and bold-bright
+                                              (< fg 256)
+                                              (or (has? +bright+) (<= 8 fg 15)))
+                                         (progn (face! :weight 'bold)
+                                                (face! :foreground
+                                                       (fmt-256 (if (<= 8 fg) (- fg 8) fg)))))
+                                        ((and bright-bold)
+                                         (face! :foreground
+                                                (if (> fg 255)
+                                                    (fmt-24bit (unpack fg))
+                                                  (fmt-256 (if (and (<= fg 7) (has? +bright+))
+                                                               (+ fg 8)
+                                                             fg)))))
+                                        (t (face! :foreground
+                                                  (if (> fg 255)
+                                                      (fmt-24bit (unpack fg))
+                                                    (fmt-256 fg)))
+                                           (if (has? +bright+)
+                                               (face! :weight 'bold)))))
             (make-color-bg ()    `(face! :background (cond ((> bg 255) (fmt-24bit (unpack bg)))
                                                            (t (fmt-256 bg)))))
             (make-face ()        `(let* (k
