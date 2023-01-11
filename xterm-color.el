@@ -251,7 +251,7 @@ Also see `xterm-color-debug'."
      ,@body))
 
 (cl-defmacro xterm-color--create-SGR-table ((attrib SGR-list) &body body)
-  "Create an iteration/dispatch table based on provided rules that match SGR attributes.
+  "Create a dispatch table based on provided rules that match SGR attributes.
 For each attribute in SGR-LIST, check to see if it matches a rule in BODY and
 evaluate the rule body if that is the case.
 
@@ -263,8 +263,8 @@ BODY must contain rules with each rule being a list of form:
 
 CONDITION must be a Lisp form which is evaluated as part of a COND
 condition clause. If it is an atom, it is rewritten to (eq CONDITION ATTRIB).
-Otherwise it is used as is. As per COND statement, if CONDITION evaluates
-to non-nil, rule body forms are evaluated as part of the body of the COND clause.
+Otherwise it is used as is. As per COND statement, if CONDITION evaluates to
+non-nil, rule body forms are evaluated as part of the body of the COND clause.
 
 SKIP, if given, must be an integer specifying the number of elements that
 should be skipped before the next iteration. The default is 1,
@@ -695,9 +695,9 @@ This can be inserted into `comint-preoutput-filter-functions'."
 ;;;###autoload
 (cl-defun xterm-color-colorize-buffer (&optional use-overlays)
   "Apply `xterm-color-filter' to current buffer, and replace its contents.
-Colors are applied using 'face, unless font-lock-mode is active, in
-which case 'font-lock-face is used. Operation with font-lock mode active
-is not recommended.
+Colors are applied using \\='face, unless `font-lock-mode' is
+active, in which case \\='font-lock-face is used. Operation with
+`font-lock-mode' active is not recommended.
 
 If USE-OVERLAYS is non-nil, colors are applied to the buffer using overlays
 instead of text properties. A C-u prefix arg causes overlays to be used."
