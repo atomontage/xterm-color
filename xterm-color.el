@@ -220,7 +220,8 @@ frame, overline.")
           (when current-value
             (let ((ov (make-overlay pos next-change)))
               (overlay-put ov face-prop current-value)
-              (overlay-put ov 'xterm-color t)))
+              (overlay-put ov 'xterm-color t)
+              (overlay-put ov 'evaporate t)))
           (goto-char next-change)))
       (remove-text-properties beg end (list 'xterm-color nil face-prop nil)))))
 
