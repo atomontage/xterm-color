@@ -58,9 +58,9 @@ but you should take into account modes that propertize strings and pass them
 through ~comint-preoutput-filter-functions~ since ~xterm-color-filter~ will
 strip all text properties (this is done to get maximum performance). The
 recommended configuration that avoids issues is to remove ~ansi-color-process-output~
-from ~comint-output-filter-functions~ and add ~xterm-color-filter~ as the *first*
-hook in the buffer-local ~comint-preoutput-filter-functions~ for any comint-based
-mode that you would like it to affect (e.g. shell-mode).
+from the buffer-local ~comint-output-filter-functions~ and add ~xterm-color-filter~ as
+the *first* hook in the buffer-local ~comint-preoutput-filter-functions~ for any
+comint-based mode that you would like it to affect (e.g. shell-mode).
 
 Additionally, it is recommended to disable font-locking for shell-mode buffers
 [[https://github.com/atomontage/xterm-color/issues/28][since it interacts badly with comint and drastically affects performance]].
@@ -70,9 +70,6 @@ handle faces fine by itself.
 Example configuration for shell-mode (M-x shell):
 
 #+BEGIN_SRC emacs-lisp
-(setq comint-output-filter-functions
-      (remove 'ansi-color-process-output comint-output-filter-functions))
-
 (add-hook 'shell-mode-hook
           (lambda ()
             ;; Disable font-locking in this buffer to improve performance
@@ -80,6 +77,9 @@ Example configuration for shell-mode (M-x shell):
             ;; Prevent font-locking from being re-enabled in this buffer
             (make-local-variable 'font-lock-function)
             (setq font-lock-function (lambda (_) nil))
+            ;; Replace ansi-color-process-output with xterm-color-filter
+            (make-local-variable 'comint-output-filter-functions)
+            (remove-hook 'comint-output-filter-functions 'ansi-color-process-output t)
             (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t)))
 
 ;; Also set TERM accordingly (xterm-256color) in the shell itself.
