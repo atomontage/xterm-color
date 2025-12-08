@@ -112,10 +112,8 @@ For standalone compilation buffers use the following configuration:
 #+BEGIN_SRC emacs-lisp
 (setq compilation-environment '("TERM=xterm-256color"))
 
-(defun my/advice-compilation-filter (f proc string)
+(define-advice compilation-filter (:around (f proc string) xterm-color)
   (funcall f proc (xterm-color-filter string)))
-
-(advice-add 'compilation-filter :around #'my/advice-compilation-filter)
 #+END_SRC
 
 *NOTE*: This compilation-mode configuration will break
