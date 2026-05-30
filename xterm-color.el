@@ -350,48 +350,52 @@ going down SGR-LIST one element at a time."
                   (eq 2 (cl-second SGR-list)))          ; Truecolor (24-bit) FG color
              :skip 5)
             (when xterm-color--support-truecolor
-              (if-let ((r (cl-third SGR-list))
-                       (g (cl-fourth SGR-list))
-                       (b (cl-fifth SGR-list)))
-                  (if (or (> r 255) (> g 255) (> b 255))
-                      (xterm-color--message "SGR 38;2;%s;%s;%s exceeds range"
-                                            r g b)
-                    (set-truecolor! r g b xterm-color--current-fg))
-                (xterm-color--message "SGR 38;2;%s;%s;%s error, expected 38;2;R;G;B"
-                                      r g b))))
+              (let ((r (cl-third SGR-list))
+                    (g (cl-fourth SGR-list))
+                    (b (cl-fifth SGR-list)))
+                (if (and r g b)
+                    (if (or (> r 255) (> g 255) (> b 255))
+                        (xterm-color--message "SGR 38;2;%s;%s;%s exceeds range"
+                                              r g b)
+                      (set-truecolor! r g b xterm-color--current-fg))
+                  (xterm-color--message "SGR 38;2;%s;%s;%s error, expected 38;2;R;G;B"
+                                        r g b)))))
     (:match ((and (eq 38 (cl-first SGR-list))
                   (eq 5 (cl-second SGR-list)))
              :skip 3)                                   ; XTERM 256 FG color
-            (if-let ((color (cl-third SGR-list)))
-                (if (> color 255)
-                    (xterm-color--message "SGR 38;5;%s exceeds range" color)
-                  (set-f! color))
-              (xterm-color--message "SGR 38;5;%s error, expected 38;5;COLOR"
-                                    color)))
+            (let ((color (cl-third SGR-list)))
+              (if color
+                  (if (> color 255)
+                      (xterm-color--message "SGR 38;5;%s exceeds range" color)
+                    (set-f! color))
+                (xterm-color--message "SGR 38;5;%s error, expected 38;5;COLOR"
+                                      color))))
 
     (:match ((and (eq 48 (cl-first SGR-list))
                   (eq 2 (cl-second SGR-list)))          ; Truecolor (24-bit) BG color
              :skip 5)
             (when xterm-color--support-truecolor
-              (if-let ((r (cl-third SGR-list))
-                       (g (cl-fourth SGR-list))
-                       (b (cl-fifth SGR-list)))
-                  (if (or (> r 255) (> g 255) (> b 255))
-                      (xterm-color--message "SGR 48;2;%s;%s;%s exceeds range"
-                                            r g b)
-                    (set-truecolor! r g b xterm-color--current-bg))
-                (xterm-color--message "SGR 48;2;%s;%s;%s error, expected 48;2;R;G;B"
-                                      r g b))))
+              (let ((r (cl-third SGR-list))
+                    (g (cl-fourth SGR-list))
+                    (b (cl-fifth SGR-list)))
+                (if (and r g b)
+                    (if (or (> r 255) (> g 255) (> b 255))
+                        (xterm-color--message "SGR 48;2;%s;%s;%s exceeds range"
+                                              r g b)
+                      (set-truecolor! r g b xterm-color--current-bg))
+                  (xterm-color--message "SGR 48;2;%s;%s;%s error, expected 48;2;R;G;B"
+                                        r g b)))))
 
     (:match ((and (eq 48 (cl-first SGR-list))
                   (eq 5 (cl-second SGR-list)))
              :skip 3)                                   ; XTERM 256 BG color
-            (if-let ((color (cl-third SGR-list)))
-                (if (> color 255)
-                    (xterm-color--message "SGR 48;5;%s exceeds range" color)
-                  (set-b! color))
-              (xterm-color--message "SGR 48;5;%s error, expected 48;5;COLOR"
-                                    color)))
+            (let ((color (cl-third SGR-list)))
+              (if color
+                  (if (> color 255)
+                      (xterm-color--message "SGR 48;5;%s exceeds range" color)
+                    (set-b! color))
+                (xterm-color--message "SGR 48;5;%s error, expected 48;5;COLOR"
+                                      color))))
     (:match ((<= 90 elem 97))                           ; AIXTERM hi-intensity FG
             ;; Rather than setting bright, which would be wrong,
             ;; rescale color to fall within 8-15 so that it gets
