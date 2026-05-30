@@ -7,7 +7,7 @@
 ;; Version: 2.0
 ;; Author: xristos <xristos@sdf.org>
 ;; URL: https://github.com/atomontage/xterm-color
-;; Package-Requires: ((emacs "24.4"))
+;; Package-Requires: ((emacs "25.1"))
 ;; Keywords: faces
 
 ;; Redistribution and use in source and binary forms, with or without
